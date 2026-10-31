@@ -1,7 +1,7 @@
-// Paint Tool - Windows Paint-like application using the Glimmer GUI library.
-//copyright (c) 2026 Glimmer Developers. All rights reserved.
-// Compiled as my_app via CMakeLists.txt:
-//   cmake --build build --config Release --target my_app
+// ════════════════════════════════════════════════════════════════════════════
+// Glimmer Paint  –  a Windows-Paint-style demo using the Glimmer GUI library
+// Build:  cmake --build build --config Release --target my_app
+// ════════════════════════════════════════════════════════════════════════════
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -11,62 +11,58 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Constants
+// Layout constants
 // ─────────────────────────────────────────────────────────────────────────────
 namespace {
 
-constexpr int kWinWidth  = 1100;
-constexpr int kWinHeight = 700;
+constexpr int kWinW       = 1200;
+constexpr int kWinH       = 720;
+constexpr int kToolW      = 210;   // left tool panel
+constexpr int kStatusH    = 22;    // bottom status bar
+constexpr int kMenuH      = 30;    // top menu/toolbar strip
+constexpr int kCanvasX    = kToolW;
+constexpr int kCanvasY    = kMenuH;
+constexpr int kCanvasW    = kWinW - kToolW;
+constexpr int kCanvasH    = kWinH - kMenuH - kStatusH;
 
-constexpr int kToolPanelW = 180;
-constexpr int kCanvasX    = kToolPanelW;
-constexpr int kCanvasY    = 0;
-constexpr int kCanvasW    = kWinWidth  - kToolPanelW;
-constexpr int kCanvasH    = kWinHeight;
-
-// Frame timer id
-constexpr UINT_PTR kFrameTimer = 1U;
+constexpr UINT_PTR kTimer = 1U;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tool enum
+// Tool definitions
 // ─────────────────────────────────────────────────────────────────────────────
 enum class Tool {
     Pencil = 0,
     Brush,
+    Spray,
     Eraser,
     Line,
     Rectangle,
-    FilledRectangle,
+    FilledRect,
+    RoundRect,
     Circle,
     FilledCircle,
+    Ellipse,
     Fill,
     ColorPicker,
     COUNT
 };
 
-const std::vector<std::string> kToolNames{
-    "Pencil",
-    "Brush",
-    "Eraser",
-    "Line",
-    "Rectangle",
-    "Filled Rect",
-    "Circle",
-    "Filled Circle",
-    "Fill",
-    "Color Picker",
+const std::vector<std::string> kToolNames = {
+    "Pencil", "Brush", "Spray", "Eraser",
+    "Line", "Rectangle", "Filled Rect", "Round Rect",
+    "Circle", "Filled Circle", "Ellipse",
+    "Fill", "Color Pick",
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Color palette
-// ─────────────────────────────────────────────────────────────────────────────
-const std::vector<std::uint32_t> kPalette{
+// Colour palette (24-colour × 2 rows like classic Paint)
+const std::vector<std::uint32_t> kPalette = {
     0xFF000000U, 0xFF808080U, 0xFFFFFFFFU, 0xFFC0C0C0U,
     0xFF800000U, 0xFFFF0000U, 0xFF804000U, 0xFFFF8040U,
     0xFF808000U, 0xFFFFFF00U, 0xFF008000U, 0xFF00FF00U,
@@ -76,451 +72,547 @@ const std::vector<std::uint32_t> kPalette{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Application state
+// App globals
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Glimmer UI context (full window)
-glm::Context g_ui(kWinWidth, kWinHeight);
+// Glimmer context (full window)
+glm::Theme make_theme() {
+    glm::Theme t;
+    // slightly warmer dark to match the paint-tool aesthetic
+    t.background        = 0xFF232323U;
+    t.window            = 0xFF2D2D2DU;
+    t.title_bar         = 0xFF333333U;
+    t.text              = 0xFFDDDDDDU;
+    t.accent            = 0xFF4F8FD4U;
+    t.button            = 0xFF404040U;
+    t.button_hover      = 0xFF5568A0U;
+    t.button_active     = 0xFF3D6FA8U;
+    t.border            = 0xFF484848U;
+    t.padding           = 5;
+    t.font_scale        = 1;
+    t.tooltip_delay_frames = 20U;
+    return t;
+}
+glm::Context g_ui(kWinW, kWinH, make_theme());
 
-// The paint canvas – a separate Surface we draw into
+// The paint canvas surface
 glm::Surface g_canvas(kCanvasW, kCanvasH);
+glm::Surface g_preview(kCanvasW, kCanvasH);
 
-// DIB pixel buffer for Win32 StretchDIBits
-std::vector<std::uint32_t> g_dib(static_cast<std::size_t>(kWinWidth) *
-                                  static_cast<std::size_t>(kWinHeight));
+// DIB scratch buffer for Win32
+std::vector<std::uint32_t> g_dib(static_cast<std::size_t>(kWinW) *
+                                   static_cast<std::size_t>(kWinH));
 
-// Input state forwarded from Win32
-int  g_mx       = 0;
-int  g_my       = 0;
-bool g_ldown    = false;
+// Input
+int  g_mx = 0, g_my = 0;
+bool g_ldown = false;
 
 // Tool state
-Tool g_tool           = Tool::Pencil;
-int  g_selected_tool  = 0;
-std::uint32_t g_fg_color = 0xFF000000U; // foreground (packed AABBGGRR)
-std::uint32_t g_bg_color = 0xFFFFFFFFU; // background
-std::size_t   g_fg_palette_sel = 0U;
-std::size_t   g_bg_palette_sel = 2U;
-float         g_brush_size     = 4.0f;  // slider value 1-30
-int           g_brush_size_int = 4;
+Tool        g_tool         = Tool::Pencil;
+int         g_tool_idx     = 0;
+std::uint32_t g_fg         = 0xFF000000U;
+std::uint32_t g_bg         = 0xFFFFFFFFU;
+std::size_t g_fg_pal       = 0U;
+std::size_t g_bg_pal       = 2U;
+float       g_size_f       = 3.0f;   // slider 1-40
+int         g_size         = 3;
+float       g_opacity_f    = 1.0f;   // 0-1
 
-// Canvas interaction – previous mouse pos for stroke
-int  g_prev_cx = -1;
-int  g_prev_cy = -1;
-bool g_drawing = false;
+// Drawing state
+int  g_px = -1, g_py = -1;    // previous canvas coords
+int  g_sx = 0,  g_sy = 0;     // shape start
+bool g_drawing      = false;
+bool g_preview_live = false;
 
-// For shape tools: start point
-int  g_shape_sx = 0;
-int  g_shape_sy = 0;
+// Undo / redo
+constexpr std::size_t kMaxUndo = 30U;
+std::vector<std::vector<std::uint32_t>> g_undo, g_redo;
 
-// Preview canvas (used to show shape preview without committing)
-glm::Surface g_preview_canvas(kCanvasW, kCanvasH);
-bool         g_preview_valid = false;
+// Status
+std::string g_status = "Ready  |  Glimmer Paint";
+int         g_zoom   = 1;   // future: canvas zoom
 
-// Undo stack (simple: store raw pixel buffers)
-constexpr std::size_t kMaxUndo = 20U;
-std::vector<std::vector<std::uint32_t>> g_undo_stack;
-std::vector<std::vector<std::uint32_t>> g_redo_stack;
+// Layer name (cosmetic, one layer for now)
+std::string g_layer_name = "Layer 1";
 
-// Status bar text
-std::string g_status = "Ready";
+// Recent colours (last 8 used)
+std::vector<std::uint32_t> g_recent_colors;
+
+// Mini-preview toggle in tool panel
+bool g_show_preview_panel = true;
+
+// Grid overlay
+bool g_show_grid = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Push current canvas pixels onto the undo stack
 void push_undo() {
     const std::uint32_t* px = g_canvas.pixels();
     std::size_t n = static_cast<std::size_t>(g_canvas.width()) *
                     static_cast<std::size_t>(g_canvas.height());
-    g_undo_stack.push_back(std::vector<std::uint32_t>(px, px + n));
-    if (g_undo_stack.size() > kMaxUndo) {
-        g_undo_stack.erase(g_undo_stack.begin());
-    }
-    g_redo_stack.clear();
+    g_undo.push_back(std::vector<std::uint32_t>(px, px + n));
+    if (g_undo.size() > kMaxUndo) g_undo.erase(g_undo.begin());
+    g_redo.clear();
 }
 
 void do_undo() {
-    if (g_undo_stack.empty()) return;
-    // Save current for redo
+    if (g_undo.empty()) return;
     const std::uint32_t* px = g_canvas.pixels();
     std::size_t n = static_cast<std::size_t>(g_canvas.width()) *
                     static_cast<std::size_t>(g_canvas.height());
-    g_redo_stack.push_back(std::vector<std::uint32_t>(px, px + n));
-
-    // Restore last undo state
-    auto& state = g_undo_stack.back();
-    std::uint32_t* dst = g_canvas.pixels();
-    std::memcpy(dst, state.data(), n * sizeof(std::uint32_t));
-    g_undo_stack.pop_back();
+    g_redo.push_back(std::vector<std::uint32_t>(px, px + n));
+    std::memcpy(g_canvas.pixels(), g_undo.back().data(), n * sizeof(std::uint32_t));
+    g_undo.pop_back();
 }
 
 void do_redo() {
-    if (g_redo_stack.empty()) return;
+    if (g_redo.empty()) return;
     const std::uint32_t* px = g_canvas.pixels();
     std::size_t n = static_cast<std::size_t>(g_canvas.width()) *
                     static_cast<std::size_t>(g_canvas.height());
-    g_undo_stack.push_back(std::vector<std::uint32_t>(px, px + n));
-
-    auto& state = g_redo_stack.back();
-    std::uint32_t* dst = g_canvas.pixels();
-    std::memcpy(dst, state.data(), n * sizeof(std::uint32_t));
-    g_redo_stack.pop_back();
+    g_undo.push_back(std::vector<std::uint32_t>(px, px + n));
+    std::memcpy(g_canvas.pixels(), g_redo.back().data(), n * sizeof(std::uint32_t));
+    g_redo.pop_back();
 }
 
-// Flood fill using the canvas pixel buffer directly
-void flood_fill(int cx, int cy, std::uint32_t fill_color) {
-    int w = g_canvas.width();
-    int h = g_canvas.height();
-    if (cx < 0 || cy < 0 || cx >= w || cy >= h) return;
-
-    std::uint32_t* px = g_canvas.pixels();
-    std::uint32_t  target = px[cy * w + cx];
-    if (target == fill_color) return;
-
-    // Iterative BFS
-    std::vector<int> stack;
-    stack.reserve(4096);
-    stack.push_back(cy * w + cx);
-
-    while (!stack.empty()) {
-        int idx = stack.back();
-        stack.pop_back();
-        if (idx < 0 || idx >= w * h) continue;
-        if (px[idx] != target) continue;
-        px[idx] = fill_color;
-
-        int x = idx % w;
-        int y = idx / w;
-        if (x > 0)     stack.push_back(idx - 1);
-        if (x < w - 1) stack.push_back(idx + 1);
-        if (y > 0)     stack.push_back(idx - w);
-        if (y < h - 1) stack.push_back(idx + w);
-    }
+void blit(glm::Surface& dst, const glm::Surface& src) {
+    std::memcpy(dst.pixels(), src.pixels(),
+                static_cast<std::size_t>(src.width()) *
+                static_cast<std::size_t>(src.height()) * sizeof(std::uint32_t));
 }
 
-// Erase color = background color on the canvas (fully opaque white by default)
-std::uint32_t erase_color() { return g_bg_color; }
+void clear_canvas(std::uint32_t color = 0xFFFFFFFFU) {
+    g_canvas.fill_rect({0, 0,
+        static_cast<float>(kCanvasW), static_cast<float>(kCanvasH)}, color);
+}
 
-// Canvas-local mouse coordinates (subtract tool panel offset)
-int canvas_mx() { return g_mx - kCanvasX; }
-int canvas_my() { return g_my - kCanvasY; }
+// Push a colour into the recent list (deduplicate, cap at 8)
+void record_color(std::uint32_t c) {
+    g_recent_colors.erase(
+        std::remove(g_recent_colors.begin(), g_recent_colors.end(), c),
+        g_recent_colors.end());
+    g_recent_colors.insert(g_recent_colors.begin(), c);
+    if (g_recent_colors.size() > 8U) g_recent_colors.resize(8U);
+}
 
-// Is the mouse inside the canvas area?
+// Canvas-local coords
+int cx() { return g_mx - kCanvasX; }
+int cy() { return g_my - kCanvasY; }
 bool in_canvas() {
-    int cx = canvas_mx(), cy = canvas_my();
-    return cx >= 0 && cy >= 0 && cx < kCanvasW && cy < kCanvasH;
+    return cx() >= 0 && cy() >= 0 && cx() < kCanvasW && cy() < kCanvasH;
 }
 
-// Brush draw: a filled circle stroke on the canvas
-void draw_brush_stroke(glm::Surface& surf, int x0, int y0, int x1, int y1,
-                        std::uint32_t color, int radius) {
-    // Draw filled circles along the line from (x0,y0) to (x1,y1)
+// Stroke helpers
+void pencil_stroke(glm::Surface& s, int x0, int y0, int x1, int y1, std::uint32_t c) {
+    s.draw_line(x0, y0, x1, y1, c);
+}
+
+void brush_stroke(glm::Surface& s, int x0, int y0, int x1, int y1,
+                   std::uint32_t c, int r) {
     int dx = x1 - x0, dy = y1 - y0;
     int steps = std::max(1, std::max(std::abs(dx), std::abs(dy)));
     for (int i = 0; i <= steps; ++i) {
-        int bx = x0 + dx * i / steps;
-        int by = y0 + dy * i / steps;
-        surf.draw_filled_circle(bx, by, radius, color);
+        s.draw_filled_circle(x0 + dx * i / steps, y0 + dy * i / steps, r, c);
     }
 }
 
-// Thin pencil line
-void draw_pencil_stroke(glm::Surface& surf, int x0, int y0, int x1, int y1,
-                         std::uint32_t color) {
-    surf.draw_line(x0, y0, x1, y1, color);
-}
-
-// Copy pixels from src surface to dst surface
-void blit_surface(glm::Surface& dst, const glm::Surface& src) {
-    std::memcpy(dst.pixels(),
-                src.pixels(),
-                static_cast<std::size_t>(src.width()) *
-                static_cast<std::size_t>(src.height()) *
-                sizeof(std::uint32_t));
-}
-
-// Initialize the canvas to the background color
-void clear_canvas() {
-    g_canvas.fill_rect({0.0f, 0.0f,
-                         static_cast<float>(kCanvasW),
-                         static_cast<float>(kCanvasH)},
-                        0xFFFFFFFFU);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Handle canvas mouse interaction
-// ─────────────────────────────────────────────────────────────────────────────
-void on_canvas_down(int cx, int cy) {
-    g_shape_sx = cx;
-    g_shape_sy = cy;
-    g_drawing  = true;
-
-    switch (g_tool) {
-        case Tool::Pencil:
-            push_undo();
-            draw_pencil_stroke(g_canvas, cx, cy, cx, cy, g_fg_color);
-            break;
-        case Tool::Brush:
-            push_undo();
-            draw_brush_stroke(g_canvas, cx, cy, cx, cy, g_fg_color, g_brush_size_int);
-            break;
-        case Tool::Eraser:
-            push_undo();
-            draw_brush_stroke(g_canvas, cx, cy, cx, cy, erase_color(), g_brush_size_int);
-            break;
-        case Tool::Fill:
-            push_undo();
-            flood_fill(cx, cy, g_fg_color);
-            break;
-        case Tool::ColorPicker: {
-            int w = g_canvas.width();
-            if (cx >= 0 && cy >= 0 && cx < w && cy < g_canvas.height()) {
-                g_fg_color = g_canvas.pixels()[cy * w + cx];
-            }
-            g_drawing = false;
-            g_status  = "Color picked";
-            break;
+void spray_stroke(glm::Surface& s, int cx2, int cy2, std::uint32_t c, int r) {
+    // scatter random-ish dots inside radius
+    for (int i = 0; i < 20; ++i) {
+        // deterministic pseudo-random using frame counter mixed with i
+        int rx = (((cx2 * 1103515245 + i * 12345 + 19) >> 4) % (2 * r + 1)) - r;
+        int ry = (((cy2 * 1664525  + i * 6547  + 31) >> 3) % (2 * r + 1)) - r;
+        if (rx * rx + ry * ry <= r * r) {
+            s.draw_filled_circle(cx2 + rx, cy2 + ry, 0, c);
         }
-        default:
-            // Shape tools: snapshot canvas for preview
-            push_undo();
-            blit_surface(g_preview_canvas, g_canvas);
-            g_preview_valid = true;
-            break;
     }
-    g_prev_cx = cx;
-    g_prev_cy = cy;
 }
 
-void on_canvas_move(int cx, int cy) {
-    if (!g_drawing) return;
+// Flood fill
+void flood_fill(int px2, int py2, std::uint32_t fill_c) {
+    int w = g_canvas.width(), h = g_canvas.height();
+    if (px2 < 0 || py2 < 0 || px2 >= w || py2 >= h) return;
+    std::uint32_t* pix = g_canvas.pixels();
+    std::uint32_t  target = pix[py2 * w + px2];
+    if (target == fill_c) return;
+    std::vector<int> stk;
+    stk.reserve(8192);
+    stk.push_back(py2 * w + px2);
+    while (!stk.empty()) {
+        int idx = stk.back(); stk.pop_back();
+        if (idx < 0 || idx >= w * h) continue;
+        if (pix[idx] != target) continue;
+        pix[idx] = fill_c;
+        int x2 = idx % w, y2 = idx / w;
+        if (x2 > 0)      stk.push_back(idx - 1);
+        if (x2 < w - 1)  stk.push_back(idx + 1);
+        if (y2 > 0)      stk.push_back(idx - w);
+        if (y2 < h - 1)  stk.push_back(idx + w);
+    }
+}
+
+// Shape commit helper
+void commit_shape(int ex, int ey) {
+    float sx = static_cast<float>(g_sx), sy = static_cast<float>(g_sy);
+    float efx = static_cast<float>(ex), efy = static_cast<float>(ey);
+    float rx = std::min(sx, efx), ry = std::min(sy, efy);
+    float rw = std::abs(efx - sx), rh = std::abs(efy - sy);
 
     switch (g_tool) {
-        case Tool::Pencil:
-            draw_pencil_stroke(g_canvas, g_prev_cx, g_prev_cy, cx, cy, g_fg_color);
-            break;
-        case Tool::Brush:
-            draw_brush_stroke(g_canvas, g_prev_cx, g_prev_cy, cx, cy, g_fg_color, g_brush_size_int);
-            break;
-        case Tool::Eraser:
-            draw_brush_stroke(g_canvas, g_prev_cx, g_prev_cy, cx, cy, erase_color(), g_brush_size_int);
-            break;
         case Tool::Line:
+            g_canvas.draw_line(g_sx, g_sy, ex, ey, g_fg);
+            break;
         case Tool::Rectangle:
-        case Tool::FilledRectangle:
-        case Tool::Circle:
-        case Tool::FilledCircle:
-            // Restore base and draw preview shape
-            if (g_preview_valid) {
-                blit_surface(g_canvas, g_preview_canvas);
-                float sx = static_cast<float>(g_shape_sx);
-                float sy = static_cast<float>(g_shape_sy);
-                float ex = static_cast<float>(cx);
-                float ey = static_cast<float>(cy);
-                if (g_tool == Tool::Line) {
-                    g_canvas.draw_line(g_shape_sx, g_shape_sy, cx, cy, g_fg_color);
-                } else if (g_tool == Tool::Rectangle) {
-                    float rx = std::min(sx, ex);
-                    float ry = std::min(sy, ey);
-                    float rw = std::abs(ex - sx);
-                    float rh = std::abs(ey - sy);
-                    g_canvas.outline_rect({rx, ry, rw, rh}, g_fg_color, 2.0f);
-                } else if (g_tool == Tool::FilledRectangle) {
-                    float rx = std::min(sx, ex);
-                    float ry = std::min(sy, ey);
-                    float rw = std::abs(ex - sx);
-                    float rh = std::abs(ey - sy);
-                    g_canvas.fill_rect({rx, ry, rw, rh}, g_fg_color);
-                } else if (g_tool == Tool::Circle) {
-                    int rad = static_cast<int>(std::sqrt(
-                        static_cast<float>((cx - g_shape_sx) * (cx - g_shape_sx) +
-                                           (cy - g_shape_sy) * (cy - g_shape_sy))));
-                    g_canvas.draw_circle_outline(g_shape_sx, g_shape_sy, rad, g_fg_color, 2);
-                } else if (g_tool == Tool::FilledCircle) {
-                    int rad = static_cast<int>(std::sqrt(
-                        static_cast<float>((cx - g_shape_sx) * (cx - g_shape_sx) +
-                                           (cy - g_shape_sy) * (cy - g_shape_sy))));
-                    g_canvas.draw_filled_circle(g_shape_sx, g_shape_sy, rad, g_fg_color);
-                }
-            }
+            g_canvas.outline_rect({rx, ry, rw, rh}, g_fg,
+                                   static_cast<float>(std::max(1, g_size)));
             break;
-        default:
+        case Tool::FilledRect:
+            g_canvas.fill_rect({rx, ry, rw, rh}, g_fg);
             break;
-    }
-
-    g_prev_cx = cx;
-    g_prev_cy = cy;
-}
-
-void on_canvas_up(int cx, int cy) {
-    if (!g_drawing) return;
-
-    // Finalize shape tools
-    switch (g_tool) {
-        case Tool::Line:
-            g_canvas.draw_line(g_shape_sx, g_shape_sy, cx, cy, g_fg_color);
+        case Tool::RoundRect:
+            g_canvas.draw_rounded_rect_outline({rx, ry, rw, rh}, 10.0f, g_fg,
+                                               static_cast<float>(std::max(1, g_size)));
             break;
-        case Tool::Rectangle: {
-            float sx = static_cast<float>(g_shape_sx);
-            float sy = static_cast<float>(g_shape_sy);
-            float ex = static_cast<float>(cx);
-            float ey = static_cast<float>(cy);
-            float rx = std::min(sx, ex), ry = std::min(sy, ey);
-            float rw = std::abs(ex - sx), rh = std::abs(ey - sy);
-            g_canvas.outline_rect({rx, ry, rw, rh}, g_fg_color, 2.0f);
-            break;
-        }
-        case Tool::FilledRectangle: {
-            float sx = static_cast<float>(g_shape_sx);
-            float sy = static_cast<float>(g_shape_sy);
-            float ex = static_cast<float>(cx);
-            float ey = static_cast<float>(cy);
-            float rx = std::min(sx, ex), ry = std::min(sy, ey);
-            float rw = std::abs(ex - sx), rh = std::abs(ey - sy);
-            g_canvas.fill_rect({rx, ry, rw, rh}, g_fg_color);
-            break;
-        }
         case Tool::Circle: {
             int rad = static_cast<int>(std::sqrt(
-                static_cast<float>((cx - g_shape_sx) * (cx - g_shape_sx) +
-                                   (cy - g_shape_sy) * (cy - g_shape_sy))));
-            if (g_preview_valid) blit_surface(g_canvas, g_preview_canvas);
-            g_canvas.draw_circle_outline(g_shape_sx, g_shape_sy, rad, g_fg_color, 2);
+                static_cast<float>((ex - g_sx)*(ex - g_sx) + (ey - g_sy)*(ey - g_sy))));
+            g_canvas.draw_circle_outline(g_sx, g_sy, rad, g_fg, std::max(1, g_size));
             break;
         }
         case Tool::FilledCircle: {
             int rad = static_cast<int>(std::sqrt(
-                static_cast<float>((cx - g_shape_sx) * (cx - g_shape_sx) +
-                                   (cy - g_shape_sy) * (cy - g_shape_sy))));
-            if (g_preview_valid) blit_surface(g_canvas, g_preview_canvas);
-            g_canvas.draw_filled_circle(g_shape_sx, g_shape_sy, rad, g_fg_color);
+                static_cast<float>((ex - g_sx)*(ex - g_sx) + (ey - g_sy)*(ey - g_sy))));
+            g_canvas.draw_filled_circle(g_sx, g_sy, rad, g_fg);
             break;
         }
-        default:
+        case Tool::Ellipse:
+            g_canvas.draw_ellipse_outline({rx, ry, rw, rh}, g_fg,
+                                           static_cast<float>(std::max(1, g_size)));
             break;
+        default: break;
     }
+}
 
-    g_drawing       = false;
-    g_preview_valid = false;
+// Redraw preview shape on top of snapshot
+void update_preview(int ex, int ey) {
+    if (!g_preview_live) return;
+    blit(g_canvas, g_preview);
+    commit_shape(ex, ey);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Render one frame
+// Canvas mouse events
+// ─────────────────────────────────────────────────────────────────────────────
+void canvas_down(int x, int y) {
+    g_sx = x; g_sy = y;
+    g_drawing = true;
+    record_color(g_fg);
+
+    switch (g_tool) {
+        case Tool::Pencil:
+            push_undo();
+            pencil_stroke(g_canvas, x, y, x, y, g_fg);
+            break;
+        case Tool::Brush:
+            push_undo();
+            brush_stroke(g_canvas, x, y, x, y, g_fg, g_size);
+            break;
+        case Tool::Spray:
+            push_undo();
+            spray_stroke(g_canvas, x, y, g_fg, g_size * 5);
+            break;
+        case Tool::Eraser:
+            push_undo();
+            brush_stroke(g_canvas, x, y, x, y, g_bg, g_size);
+            break;
+        case Tool::Fill:
+            push_undo();
+            flood_fill(x, y, g_fg);
+            g_drawing = false;
+            break;
+        case Tool::ColorPicker: {
+            if (x >= 0 && y >= 0 && x < g_canvas.width() && y < g_canvas.height()) {
+                g_fg = g_canvas.pixels()[y * g_canvas.width() + x];
+                record_color(g_fg);
+            }
+            g_drawing = false;
+            break;
+        }
+        default:
+            push_undo();
+            blit(g_preview, g_canvas);
+            g_preview_live = true;
+            break;
+    }
+    g_px = x; g_py = y;
+}
+
+void canvas_move(int x, int y) {
+    if (!g_drawing) return;
+    switch (g_tool) {
+        case Tool::Pencil:
+            pencil_stroke(g_canvas, g_px, g_py, x, y, g_fg);
+            break;
+        case Tool::Brush:
+            brush_stroke(g_canvas, g_px, g_py, x, y, g_fg, g_size);
+            break;
+        case Tool::Spray:
+            spray_stroke(g_canvas, x, y, g_fg, g_size * 5);
+            break;
+        case Tool::Eraser:
+            brush_stroke(g_canvas, g_px, g_py, x, y, g_bg, g_size);
+            break;
+        default:
+            update_preview(x, y);
+            break;
+    }
+    g_px = x; g_py = y;
+}
+
+void canvas_up(int x, int y) {
+    if (!g_drawing) return;
+    // Finalize shapes
+    switch (g_tool) {
+        case Tool::Line:
+        case Tool::Rectangle:
+        case Tool::FilledRect:
+        case Tool::RoundRect:
+        case Tool::Circle:
+        case Tool::FilledCircle:
+        case Tool::Ellipse:
+            if (g_preview_live) {
+                blit(g_canvas, g_preview);
+                g_preview_live = false;
+            }
+            commit_shape(x, y);
+            break;
+        default: break;
+    }
+    g_drawing = false;
+    g_preview_live = false;
+    g_status = kToolNames[g_tool_idx] + "  |  " + std::to_string(x) + ", " + std::to_string(y);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Draw a pixel-art icon button for tool selection
+// ─────────────────────────────────────────────────────────────────────────────
+void draw_tool_grid(glm::Context& ui) {
+    const auto& theme = ui.theme();
+    // Draw 2-column tool grid
+    ui.begin_table("tools_table", 2U);
+    for (int i = 0; i < static_cast<int>(Tool::COUNT); ++i) {
+        bool sel = (g_tool_idx == i);
+        if (ui.selectable(kToolNames[static_cast<std::size_t>(i)], sel).clicked) {
+            g_tool_idx = i;
+            g_tool = static_cast<Tool>(i);
+        }
+        if (i % 2 == 0 && i + 1 < static_cast<int>(Tool::COUNT)) {
+            ui.next_table_column();
+        } else if (i % 2 == 1) {
+            ui.next_table_row();
+        }
+    }
+    ui.end_table();
+    (void)theme;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render frame
 // ─────────────────────────────────────────────────────────────────────────────
 void render_frame() {
     g_ui.begin(g_mx, g_my, g_ldown);
 
-    // ── Tool panel (left side) ────────────────────────────────────────────────
-    g_ui.window("Paint Tools", {0.0f, 0.0f,
-                                  static_cast<float>(kToolPanelW),
-                                  static_cast<float>(kWinHeight)}, [&] {
+    // ── Top menu bar ─────────────────────────────────────────────────────────
+    {
+        // Draw background manually at the surface level (the context owns the surface)
+        // We use a section_header-style call — but just draw as a themed row
+        // We do this by drawing a full-width row and putting buttons in it.
+        // Simulated via a fixed-height window at y=0
+        g_ui.window("##menubar", {0.0f, 0.0f,
+            static_cast<float>(kWinW), static_cast<float>(kMenuH)}, [&] {
+            // Inline layout: allocate columns manually
+            glm::Rect undo_r = g_ui.column(70.0f);
+            (void)undo_r;
+            if (g_ui.button("Undo").clicked) do_undo();
+            glm::Rect redo_r = g_ui.column(70.0f);
+            (void)redo_r;
+            if (g_ui.button("Redo").clicked) do_redo();
+            glm::Rect clear_r = g_ui.column(80.0f);
+            (void)clear_r;
+            if (g_ui.button("Clear").clicked) {
+                push_undo();
+                clear_canvas(g_bg);
+            }
+            glm::Rect grid_r = g_ui.column(80.0f);
+            (void)grid_r;
+            if (g_ui.button(g_show_grid ? "Grid ON" : "Grid OFF").clicked) {
+                g_show_grid = !g_show_grid;
+            }
+        });
+    }
 
-        g_ui.label("Tools");
-        g_ui.separator();
+    // ── Tool panel (left) ─────────────────────────────────────────────────────
+    g_ui.window("##tools", {0.0f, static_cast<float>(kMenuH),
+                              static_cast<float>(kToolW),
+                              static_cast<float>(kWinH - kMenuH - kStatusH)}, [&] {
 
-        // Radio-style tool selection via selectable rows
-        for (int i = 0; i < static_cast<int>(Tool::COUNT); ++i) {
-            bool sel = (g_selected_tool == i);
-            if (g_ui.selectable(kToolNames[static_cast<std::size_t>(i)], sel).clicked) {
-                g_selected_tool = i;
-                g_tool = static_cast<Tool>(i);
+        // ---- Section: Tools ----
+        g_ui.section_header("TOOLS");
+        g_ui.next_row(2.0f);
+        draw_tool_grid(g_ui);
+
+        // ---- Section: Stroke ----
+        g_ui.next_row(4.0f);
+        g_ui.section_header("STROKE");
+        g_ui.label("Size");
+        if (g_ui.slider("##size", g_size_f, 1.0f, 40.0f).changed) {
+            g_size = static_cast<int>(g_size_f + 0.5f);
+        }
+        g_ui.label("Size: " + std::to_string(g_size) + " px");
+        g_ui.label("Opacity");
+        g_ui.slider("##opacity", g_opacity_f, 0.0f, 1.0f);
+
+        // ---- Section: Colours ----
+        g_ui.next_row(4.0f);
+        g_ui.section_header("COLOURS");
+
+        // FG / BG swatches side by side
+        {
+            g_ui.begin_table("##swatches", 2U);
+            glm::Rect fg_r = g_ui.row(28.0f);
+            g_ui.image(&g_fg, 1, 1, fg_r);
+            g_ui.next_table_column();
+            glm::Rect bg_r = g_ui.row(28.0f);
+            g_ui.image(&g_bg, 1, 1, bg_r);
+            g_ui.end_table();
+        }
+        g_ui.label("Foreground");
+        g_ui.color_picker("##fgpick", g_fg);
+        g_ui.label("Background");
+        g_ui.color_picker("##bgpick", g_bg);
+
+        // ---- Section: Palette ----
+        g_ui.next_row(4.0f);
+        g_ui.section_header("PALETTE");
+        g_ui.color_palette("##pal", kPalette, g_fg_pal, 6U);
+        if (g_fg_pal < kPalette.size()) g_fg = kPalette[g_fg_pal];
+
+        // Recent colours
+        if (!g_recent_colors.empty()) {
+            g_ui.label("Recent");
+            g_ui.color_palette("##recent", g_recent_colors,
+                                g_fg_pal /* reuse index, doesn't matter */, 8U);
+        }
+
+        // ---- Section: Canvas info ----
+        g_ui.next_row(4.0f);
+        g_ui.section_header("CANVAS");
+        g_ui.label(std::to_string(kCanvasW) + " x " + std::to_string(kCanvasH));
+        g_ui.label(g_layer_name);
+        g_ui.checkbox("Preview panel", g_show_preview_panel);
+        g_ui.checkbox("Grid overlay", g_show_grid);
+
+        // Mini canvas preview
+        if (g_show_preview_panel) {
+            g_ui.next_row(4.0f);
+            g_ui.section_header("PREVIEW");
+            // Scale preview to fit panel width
+            float pw = static_cast<float>(kToolW - 10);
+            float ph = pw * static_cast<float>(kCanvasH) / static_cast<float>(kCanvasW);
+            glm::Rect preview_r = g_ui.row(ph);
+            g_ui.image(g_canvas, preview_r);
+        }
+
+        // Undo / redo counts
+        g_ui.next_row(4.0f);
+        g_ui.section_header("HISTORY");
+        g_ui.label("Undo: " + std::to_string(g_undo.size()));
+        g_ui.label("Redo: " + std::to_string(g_redo.size()));
+        if (g_ui.button("Undo (Ctrl+Z)").clicked) do_undo();
+        if (g_ui.button("Redo (Ctrl+Y)").clicked) do_redo();
+        if (g_ui.button("Clear canvas").clicked) {
+            push_undo();
+            clear_canvas(g_bg);
+        }
+    });
+
+    // ── Canvas area ───────────────────────────────────────────────────────────
+    {
+        glm::Rect canvas_rect{
+            static_cast<float>(kCanvasX), static_cast<float>(kCanvasY),
+            static_cast<float>(kCanvasW), static_cast<float>(kCanvasH)
+        };
+
+        // Checkerboard beneath (shows for transparent pixel art usage)
+        // We blit the canvas on top of it
+        // First: fill with white background (canvas IS white normally)
+        g_ui.draw_rect(canvas_rect, 0xFFFFFFFFU);
+        g_ui.image(g_canvas, canvas_rect);
+
+        // Grid overlay
+        if (g_show_grid) {
+            const int step = 16;
+            for (int gx = kCanvasX; gx < kCanvasX + kCanvasW; gx += step) {
+                // Can't easily draw lines through Context without drawing into surface
+                // We'll rely on draw_rect with thin cols
+                g_ui.draw_rect({static_cast<float>(gx), static_cast<float>(kCanvasY),
+                                  1.0f, static_cast<float>(kCanvasH)}, 0x22FFFFFFU);
+            }
+            for (int gy = kCanvasY; gy < kCanvasY + kCanvasH; gy += step) {
+                g_ui.draw_rect({static_cast<float>(kCanvasX), static_cast<float>(gy),
+                                  static_cast<float>(kCanvasW), 1.0f}, 0x22FFFFFFU);
             }
         }
 
-        g_ui.separator();
-        g_ui.label("Brush size");
-        if (g_ui.slider("BrushSz", g_brush_size, 1.0f, 30.0f).changed) {
-            g_brush_size_int = static_cast<int>(g_brush_size + 0.5f);
+        // Cursor crosshair when in canvas
+        if (in_canvas()) {
+            int mcx = g_mx, mcy = g_my;
+            g_ui.draw_rect({static_cast<float>(mcx - 6), static_cast<float>(mcy),
+                              12.0f, 1.0f}, 0xBB000000U);
+            g_ui.draw_rect({static_cast<float>(mcx), static_cast<float>(mcy - 6),
+                              1.0f, 12.0f}, 0xBB000000U);
         }
-        g_ui.label("Size: " + std::to_string(g_brush_size_int));
+    }
 
-        g_ui.separator();
-        g_ui.label("Foreground");
-        {
-            // Draw the foreground color swatch
-            glm::Rect swatch = g_ui.row(24.0f);
-            g_ui.image(&g_fg_color, 1, 1, swatch);
+    // ── Status bar (bottom) ───────────────────────────────────────────────────
+    g_ui.window("##status", {0.0f, static_cast<float>(kWinH - kStatusH),
+                               static_cast<float>(kWinW),
+                               static_cast<float>(kStatusH)}, [&] {
+        if (in_canvas()) {
+            g_status = kToolNames[g_tool_idx] + "  |  " +
+                       std::to_string(cx()) + ", " + std::to_string(cy()) +
+                       "  |  " + std::to_string(kCanvasW) + "x" + std::to_string(kCanvasH) +
+                       "  |  Undo: " + std::to_string(g_undo.size());
         }
-        g_ui.color_picker("FgColor", g_fg_color);
-
-        g_ui.separator();
-        g_ui.label("Background");
-        {
-            glm::Rect swatch = g_ui.row(24.0f);
-            g_ui.image(&g_bg_color, 1, 1, swatch);
-        }
-        g_ui.color_picker("BgColor", g_bg_color);
-
-        g_ui.separator();
-        g_ui.label("Palette");
-        g_ui.color_palette("Palette", kPalette, g_fg_palette_sel, 4U);
-        if (g_fg_palette_sel < kPalette.size()) {
-            g_fg_color = kPalette[g_fg_palette_sel];
-        }
-
-        g_ui.separator();
-        if (g_ui.button("Clear Canvas").clicked) {
-            push_undo();
-            clear_canvas();
-        }
-        if (g_ui.button("Undo").clicked) { do_undo(); }
-        if (g_ui.button("Redo").clicked) { do_redo(); }
-
-        g_ui.separator();
         g_ui.label(g_status);
     });
 
-    // ── Canvas area (right side) ──────────────────────────────────────────────
-    // We blit the canvas surface into the UI context at the canvas rectangle.
-    // The canvas is a separate Surface; we draw into it directly and blit each frame.
-    glm::Rect canvas_rect{
-        static_cast<float>(kCanvasX), static_cast<float>(kCanvasY),
-        static_cast<float>(kCanvasW), static_cast<float>(kCanvasH)
-    };
-    // Draw a white background behind the canvas
-    g_ui.image(g_canvas, canvas_rect);
-
-    // Update status bar with mouse position
-    if (in_canvas()) {
-        int cx = canvas_mx(), cy = canvas_my();
-        g_status = "(" + std::to_string(cx) + ", " + std::to_string(cy) + ")  " +
-                   kToolNames[g_selected_tool];
-    } else {
-        g_status = kToolNames[g_selected_tool];
-    }
-
     g_ui.end();
 
-    // ── Compose UI + canvas → DIB ─────────────────────────────────────────────
-    // The g_ui.pixels() buffer contains the rendered UI frame.
-    // Convert from AABBGGRR → GDI BBGGRR (top-down).
+    // Convert AABBGGRR → GDI BBGGRR top-down
     const std::uint32_t* src = g_ui.pixels();
     for (std::size_t i = 0; i < g_dib.size(); ++i) {
-        std::uint32_t p     = src[i];
-        std::uint32_t r     = (p      ) & 0xFFU;
-        std::uint32_t gr    = (p >>  8) & 0xFFU;
-        std::uint32_t b     = (p >> 16) & 0xFFU;
-        g_dib[i] = (r << 16) | (gr << 8) | b;
+        std::uint32_t p = src[i];
+        g_dib[i] = ((p & 0xFFU) << 16U) | (p & 0xFF00U) | ((p >> 16U) & 0xFFU);
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Win32 glue
+// Win32 plumbing
 // ─────────────────────────────────────────────────────────────────────────────
-void present_frame(HDC dc) {
+void present(HDC dc) {
     render_frame();
     BITMAPINFO bi{};
     bi.bmiHeader.biSize        = sizeof(bi.bmiHeader);
-    bi.bmiHeader.biWidth       = kWinWidth;
-    bi.bmiHeader.biHeight      = -kWinHeight;   // top-down
+    bi.bmiHeader.biWidth       = kWinW;
+    bi.bmiHeader.biHeight      = -kWinH;
     bi.bmiHeader.biPlanes      = 1;
     bi.bmiHeader.biBitCount    = 32;
     bi.bmiHeader.biCompression = BI_RGB;
     StretchDIBits(dc,
-                  0, 0, kWinWidth, kWinHeight,
-                  0, 0, kWinWidth, kWinHeight,
+                  0, 0, kWinW, kWinH,
+                  0, 0, kWinW, kWinH,
                   g_dib.data(), &bi, DIB_RGB_COLORS, SRCCOPY);
 }
 
@@ -534,45 +626,43 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_PAINT: {
             PAINTSTRUCT ps{};
             HDC dc = BeginPaint(hwnd, &ps);
-            present_frame(dc);
+            present(dc);
             EndPaint(hwnd, &ps);
             return 0;
         }
-        case WM_ERASEBKGND:
-            return 1;
+        case WM_ERASEBKGND: return 1;
         case WM_TIMER:
-            if (wp == kFrameTimer) InvalidateRect(hwnd, nullptr, FALSE);
+            if (wp == kTimer) InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
+
         case WM_MOUSEMOVE:
             update_mouse(lp);
-            if (g_ldown && in_canvas()) {
-                on_canvas_move(canvas_mx(), canvas_my());
-                InvalidateRect(hwnd, nullptr, FALSE);
-            }
+            if (g_ldown && in_canvas()) canvas_move(cx(), cy());
+            InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
+
         case WM_LBUTTONDOWN:
             update_mouse(lp);
             g_ldown = true;
             SetCapture(hwnd);
-            if (in_canvas()) {
-                on_canvas_down(canvas_mx(), canvas_my());
-            }
+            if (in_canvas()) canvas_down(cx(), cy());
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
+
         case WM_LBUTTONUP:
             update_mouse(lp);
-            if (g_ldown && in_canvas()) {
-                on_canvas_up(canvas_mx(), canvas_my());
-            }
+            if (g_ldown && in_canvas()) canvas_up(cx(), cy());
             g_ldown = false;
             ReleaseCapture();
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
+
         case WM_CAPTURECHANGED:
+            if (g_drawing) { g_drawing = false; g_preview_live = false; }
             g_ldown = false;
             return 0;
+
         case WM_MOUSEWHEEL: {
-            int delta = GET_WHEEL_DELTA_WPARAM(wp);
             POINT pt{
                 static_cast<LONG>(static_cast<short>(LOWORD(lp))),
                 static_cast<LONG>(static_cast<short>(HIWORD(lp))),
@@ -580,7 +670,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             ScreenToClient(hwnd, &pt);
             g_mx = static_cast<int>(pt.x);
             g_my = static_cast<int>(pt.y);
-            g_ui.feed_wheel(delta);
+            g_ui.feed_wheel(GET_WHEEL_DELTA_WPARAM(wp));
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
         }
@@ -590,36 +680,47 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             return 0;
+
         case WM_KEYDOWN:
             switch (wp) {
-                case VK_TAB:
-                    g_ui.feed_key(glm::Key::Tab, (GetKeyState(VK_SHIFT) & 0x8000) != 0);
+                case VK_TAB:   g_ui.feed_key(glm::Key::Tab, (GetKeyState(VK_SHIFT)&0x8000)!=0); break;
+                case VK_BACK:  g_ui.feed_key(glm::Key::Backspace); break;
+                case VK_DELETE:g_ui.feed_key(glm::Key::Delete);    break;
+                case VK_LEFT:  g_ui.feed_key(glm::Key::Left);      break;
+                case VK_RIGHT: g_ui.feed_key(glm::Key::Right);     break;
+                case VK_HOME:  g_ui.feed_key(glm::Key::Home);      break;
+                case VK_END:   g_ui.feed_key(glm::Key::End);       break;
+                case VK_RETURN:g_ui.feed_key(glm::Key::Enter);     break;
+                case VK_SPACE: g_ui.feed_key(glm::Key::Space);     break;
+                case VK_UP:    g_ui.feed_key(glm::Key::Up);        break;
+                case VK_DOWN:  g_ui.feed_key(glm::Key::Down);      break;
+                case VK_ESCAPE:g_ui.feed_key(glm::Key::Escape);    break;
+                case 'Z': if (GetKeyState(VK_CONTROL)&0x8000) do_undo(); break;
+                case 'Y': if (GetKeyState(VK_CONTROL)&0x8000) do_redo(); break;
+                // Brush size shortcuts
+                case VK_OEM_4: // [
+                    g_size_f = std::max(1.0f, g_size_f - 1.0f);
+                    g_size = static_cast<int>(g_size_f);
                     break;
-                case VK_BACK:   g_ui.feed_key(glm::Key::Backspace); break;
-                case VK_DELETE: g_ui.feed_key(glm::Key::Delete);    break;
-                case VK_LEFT:   g_ui.feed_key(glm::Key::Left);      break;
-                case VK_RIGHT:  g_ui.feed_key(glm::Key::Right);     break;
-                case VK_HOME:   g_ui.feed_key(glm::Key::Home);      break;
-                case VK_END:    g_ui.feed_key(glm::Key::End);       break;
-                case VK_RETURN: g_ui.feed_key(glm::Key::Enter);     break;
-                case VK_SPACE:  g_ui.feed_key(glm::Key::Space);     break;
-                case VK_UP:     g_ui.feed_key(glm::Key::Up);        break;
-                case VK_DOWN:   g_ui.feed_key(glm::Key::Down);      break;
-                case VK_ESCAPE: g_ui.feed_key(glm::Key::Escape);    break;
-                // Ctrl+Z = undo, Ctrl+Y = redo
-                case 'Z':
-                    if (GetKeyState(VK_CONTROL) & 0x8000) { do_undo(); }
+                case VK_OEM_6: // ]
+                    g_size_f = std::min(40.0f, g_size_f + 1.0f);
+                    g_size = static_cast<int>(g_size_f);
                     break;
-                case 'Y':
-                    if (GetKeyState(VK_CONTROL) & 0x8000) { do_redo(); }
-                    break;
-                default:
-                    return DefWindowProcW(hwnd, msg, wp, lp);
+                // Quick tool selection
+                case 'P': g_tool = Tool::Pencil;      g_tool_idx = 0; break;
+                case 'B': g_tool = Tool::Brush;       g_tool_idx = 1; break;
+                case 'E': g_tool = Tool::Eraser;      g_tool_idx = 3; break;
+                case 'L': g_tool = Tool::Line;        g_tool_idx = 4; break;
+                case 'F': g_tool = Tool::Fill;        g_tool_idx = 11; break;
+                case 'I': g_tool = Tool::ColorPicker; g_tool_idx = 12; break;
+                case 'G': g_show_grid = !g_show_grid; break;
+                default: return DefWindowProcW(hwnd, msg, wp, lp);
             }
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
+
         case WM_DESTROY:
-            KillTimer(hwnd, kFrameTimer);
+            KillTimer(hwnd, kTimer);
             PostQuitMessage(0);
             return 0;
         default:
@@ -630,66 +731,39 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 }  // namespace
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Entry point
+// WinMain
 // ─────────────────────────────────────────────────────────────────────────────
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nShow) {
-    // Fill canvas with white
+int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int nShow) {
     clear_canvas();
-    // Init preview canvas too
-    g_preview_canvas.fill_rect(
-        {0.0f, 0.0f,
-         static_cast<float>(kCanvasW),
-         static_cast<float>(kCanvasH)},
-        0xFFFFFFFFU);
+    blit(g_preview, g_canvas);
 
-    const wchar_t* kClass = L"GlimmerPaintWindow";
+    const wchar_t* kClass = L"GlimmerPaintV2";
     WNDCLASSW wc{};
     wc.lpfnWndProc   = WndProc;
-    wc.hInstance     = hInst;
+    wc.hInstance     = inst;
     wc.hCursor       = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     wc.hbrBackground = nullptr;
     wc.lpszClassName = kClass;
-    if (RegisterClassW(&wc) == 0U) {
-        MessageBoxW(nullptr, L"Window class registration failed.",
-                    L"Paint", MB_OK | MB_ICONERROR);
-        return 1;
-    }
+    if (!RegisterClassW(&wc)) { MessageBoxW(nullptr, L"Register failed", L"Paint", MB_ICONERROR); return 1; }
 
-    RECT bounds{0, 0, kWinWidth, kWinHeight};
-    AdjustWindowRect(&bounds,
-                     WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-                     FALSE);
-
-    HWND hwnd = CreateWindowExW(
-        0U, kClass, L"Glimmer Paint",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+    RECT bounds{0, 0, kWinW, kWinH};
+    AdjustWindowRect(&bounds, WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX, FALSE);
+    HWND hwnd = CreateWindowExW(0U, kClass, L"Glimmer Paint  — v2",
+        WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        bounds.right  - bounds.left,
-        bounds.bottom - bounds.top,
-        nullptr, nullptr, hInst, nullptr);
-
-    if (!hwnd) {
-        MessageBoxW(nullptr, L"Window creation failed.",
-                    L"Paint", MB_OK | MB_ICONERROR);
-        return 1;
-    }
+        bounds.right-bounds.left, bounds.bottom-bounds.top,
+        nullptr, nullptr, inst, nullptr);
+    if (!hwnd) { MessageBoxW(nullptr, L"Create failed", L"Paint", MB_ICONERROR); return 1; }
 
     ShowWindow(hwnd, nShow);
     UpdateWindow(hwnd);
-
-    // ~30 fps timer
-    if (SetTimer(hwnd, kFrameTimer, 33U, nullptr) == 0U) {
-        MessageBoxW(hwnd, L"Could not start frame timer.",
-                    L"Paint", MB_OK | MB_ICONERROR);
-        DestroyWindow(hwnd);
-        return 1;
-    }
+    SetTimer(hwnd, kTimer, 16U, nullptr);  // ~60 fps
 
     MSG m{};
-    int res = 0;
-    while ((res = static_cast<int>(GetMessageW(&m, nullptr, 0U, 0U))) > 0) {
+    int r = 0;
+    while ((r = static_cast<int>(GetMessageW(&m, nullptr, 0U, 0U))) > 0) {
         TranslateMessage(&m);
         DispatchMessageW(&m);
     }
-    return res < 0 ? 1 : static_cast<int>(m.wParam);
+    return r < 0 ? 1 : static_cast<int>(m.wParam);
 }

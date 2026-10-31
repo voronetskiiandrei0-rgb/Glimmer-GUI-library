@@ -1041,6 +1041,113 @@ public:
                     static_cast<float>(glyph_scale)};
     }
 
+    // Fills a rectangle with a solid color, skipping alpha blending (direct write).
+    void fill_rect_opaque(Rect rect, std::uint32_t color) {
+        const Rect clipped = detail::intersect(clips_.back(), rect);
+        const int left   = std::max(0, static_cast<int>(std::floor(clipped.x)));
+        const int top    = std::max(0, static_cast<int>(std::floor(clipped.y)));
+        const int right  = std::min(width_,  static_cast<int>(std::ceil(clipped.x + clipped.w)));
+        const int bottom = std::min(height_, static_cast<int>(std::ceil(clipped.y + clipped.h)));
+        const std::uint32_t opaque = color | 0xFF000000U;
+        for (int y = top; y < bottom; ++y) {
+            for (int x = left; x < right; ++x) {
+                pixels_[static_cast<std::size_t>(y) * static_cast<std::size_t>(width_) +
+                         static_cast<std::size_t>(x)] = opaque;
+            }
+        }
+    }
+
+    // Draws an arrow pointing in the given direction (0=right,1=down,2=left,3=up)
+    // inside the bounding rectangle using filled-triangle primitives.
+    void draw_arrow(Rect rect, int direction, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        const float mx = rect.x + rect.w * 0.5f;
+        const float my = rect.y + rect.h * 0.5f;
+        const float hw = rect.w * 0.4f;
+        const float hh = rect.h * 0.4f;
+        switch (direction & 3) {
+            case 0: // right
+                draw_filled_triangle(rect.x + mx - hw, my - hh,
+                                     rect.x + mx - hw, my + hh,
+                                     mx + hw,           my, color);
+                break;
+            case 1: // down
+                draw_filled_triangle(mx - hw, my - hh,
+                                     mx + hw, my - hh,
+                                     mx,      my + hh, color);
+                break;
+            case 2: // left
+                draw_filled_triangle(mx + hw, my - hh,
+                                     mx + hw, my + hh,
+                                     mx - hw, my, color);
+                break;
+            case 3: // up
+                draw_filled_triangle(mx - hw, my + hh,
+                                     mx + hw, my + hh,
+                                     mx,      my - hh, color);
+                break;
+        }
+    }
+
+    // Clears the entire surface to a solid color (ignores clip, direct write).
+    void clear(std::uint32_t color) {
+        const std::size_t n = static_cast<std::size_t>(width_) *
+                               static_cast<std::size_t>(height_);
+        std::fill(pixels_.data(), pixels_.data() + n, color);
+    }
+
+    // Resizes the surface buffer to new dimensions. Preserves overlapping pixel contents.
+    void resize(int new_width, int new_height) {
+        const int clamped_w = std::max(0, new_width);
+        const int clamped_h = std::max(0, new_height);
+        if (clamped_w == width_ && clamped_h == height_) return;
+        std::vector<std::uint32_t> new_pixels(
+            static_cast<std::size_t>(clamped_w) * static_cast<std::size_t>(clamped_h), 0U);
+        const int copy_w = std::min(width_, clamped_w);
+        const int copy_h = std::min(height_, clamped_h);
+        for (int y = 0; y < copy_h; ++y) {
+            for (int x = 0; x < copy_w; ++x) {
+                new_pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(clamped_w) + static_cast<std::size_t>(x)] =
+                    pixels_[static_cast<std::size_t>(y) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(x)];
+            }
+        }
+        width_ = clamped_w;
+        height_ = clamped_h;
+        pixels_ = std::move(new_pixels);
+        clips_.clear();
+        clips_.push_back({0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_)});
+    }
+
+    // Scales (resamples) the surface into a new width and height using nearest-neighbor.
+    void scale(int new_width, int new_height) {
+        const int clamped_w = std::max(0, new_width);
+        const int clamped_h = std::max(0, new_height);
+        if (clamped_w <= 0 || clamped_h <= 0) {
+            resize(clamped_w, clamped_h);
+            return;
+        }
+        if (clamped_w == width_ && clamped_h == height_) return;
+        if (width_ <= 0 || height_ <= 0) {
+            resize(clamped_w, clamped_h);
+            return;
+        }
+        std::vector<std::uint32_t> scaled_pixels(
+            static_cast<std::size_t>(clamped_w) * static_cast<std::size_t>(clamped_h), 0U);
+        for (int dy = 0; dy < clamped_h; ++dy) {
+            const int sy = std::min(height_ - 1, (dy * height_) / clamped_h);
+            for (int dx = 0; dx < clamped_w; ++dx) {
+                const int sx = std::min(width_ - 1, (dx * width_) / clamped_w);
+                scaled_pixels[static_cast<std::size_t>(dy) * static_cast<std::size_t>(clamped_w) + static_cast<std::size_t>(dx)] =
+                    pixels_[static_cast<std::size_t>(sy) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(sx)];
+            }
+        }
+        width_ = clamped_w;
+        height_ = clamped_h;
+        pixels_ = std::move(scaled_pixels);
+        clips_.clear();
+        clips_.push_back({0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_)});
+    }
+
 private:
     void draw_path_outline(const float* vertices, std::size_t vertex_count,
                            std::uint32_t color, float thickness, bool closed) {
@@ -1202,18 +1309,22 @@ private:
 
 // The customizable colors and spacing used by Context.
 struct Theme {
-    std::uint32_t background = 0xFF282C34U;
-    std::uint32_t window = 0xFF3A3F4BU;
-    std::uint32_t title_bar = 0xFF2D6A9FU;
-    std::uint32_t text = 0xFFFFFFFFU;
-    std::uint32_t accent = 0xFF56B6C2U;
-    std::uint32_t button = 0xFF4B5263U;
-    std::uint32_t button_hover = 0xFF5C6370U;
-    std::uint32_t button_active = 0xFF2D6A9FU;
-    std::uint32_t border = 0xFF181A1FU;
-    int padding = 8;
-    int font_scale = 1;
-    std::size_t tooltip_delay_frames = 30U;
+    // -- Background & panels -----------------------------------------
+    std::uint32_t background    = 0xFF1F1F1FU;  // near-black background
+    std::uint32_t window        = 0xFF2A2A2AU;  // panel/window fill
+    std::uint32_t title_bar     = 0xFF3D3D3DU;  // title bar (dimmed)
+    // -- Text ---------------------------------------------------------------
+    std::uint32_t text          = 0xFFE0E0E0U;  // near-white text
+    // -- Accents & interactive -------------------------------------------
+    std::uint32_t accent        = 0xFF4F8FD4U;  // ImGui blue-ish accent
+    std::uint32_t button        = 0xFF454545U;  // resting button
+    std::uint32_t button_hover  = 0xFF6060A0U;  // hovered button (purple-blue)
+    std::uint32_t button_active = 0xFF3D6FA8U;  // pressed button
+    std::uint32_t border        = 0xFF555555U;  // subtle border
+    // -- Spacing & font ----------------------------------------------------
+    int padding                 = 6;
+    int font_scale              = 1;
+    std::size_t tooltip_delay_frames = 20U;
 };
 
 // Caller-owned position and pointer state for a draggable window.
@@ -3902,6 +4013,52 @@ public:
                                 ? maximum
                                 : scroll_offset + amount;
         }
+    }
+
+    // Draws a flat colored rectangle at a surface-coordinate rect without consuming layout.
+    void draw_rect(Rect rect, std::uint32_t color) {
+        clear_last_widget();
+        surface_.fill_rect(rect, color);
+    }
+
+    // Draws a rounded-corner panel at a surface-coordinate rect without consuming layout.
+    void draw_panel(Rect rect, float radius = 4.0f) {
+        clear_last_widget();
+        surface_.draw_rounded_rect(rect, radius, theme_.window);
+        surface_.draw_rounded_rect_outline(rect, radius, theme_.border, 1.0f);
+    }
+
+    // Allocates a layout row and draws a horizontal separator rule in the accent color.
+    void section_header(const std::string& text) {
+        clear_last_widget();
+        const Rect rect = allocate(22.0f);
+        surface_.fill_rect(rect, theme_.title_bar);
+        surface_.draw_rounded_rect(rect, 3.0f, theme_.title_bar);
+        surface_.draw_text(
+            static_cast<int>(rect.x + static_cast<float>(theme_.padding)),
+            static_cast<int>(rect.y + 3.0f),
+            text, theme_.accent, theme_.font_scale);
+    }
+
+    // Resizes the UI context render target and root bounds.
+    void resize(int new_width, int new_height) {
+        surface_.resize(new_width, new_height);
+        root_ = {0.0f, 0.0f, static_cast<float>(surface_.width()), static_cast<float>(surface_.height())};
+        cursor_x_ = static_cast<float>(theme_.padding);
+        cursor_y_ = static_cast<float>(theme_.padding);
+        content_width_ = root_.w - 2.0f * static_cast<float>(theme_.padding);
+        input_clips_.clear();
+        input_clips_.push_back(root_);
+    }
+
+    // Sets global font scale multiplier used for text rendering and measurement.
+    void set_scale(int scale) {
+        theme_.font_scale = std::max(1, scale);
+    }
+
+    // Returns current font scale multiplier.
+    int scale() const {
+        return theme_.font_scale;
     }
 
 private:
