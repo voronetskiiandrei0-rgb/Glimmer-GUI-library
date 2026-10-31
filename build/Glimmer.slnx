@@ -11,6 +11,7 @@
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
 		<BuildDependency Project="glimmer_live_demo.vcxproj"/>
 		<BuildDependency Project="glimmer_tests.vcxproj"/>
+		<BuildDependency Project="my_app.vcxproj"/>
 		<BuildDependency Project="settings_panel.vcxproj"/>
 		<Build Solution="Debug|*" Project="false"/>
 		<Build Solution="Release|*" Project="false"/>
@@ -57,6 +58,9 @@
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
 	</Project>
 	<Project Path="glimmer_tests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="c8a25a18-66d4-3e4f-b7a7-a03dc9aa4309">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="my_app.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f12780bd-3373-37e2-9bf8-ba2df69605fe">
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
 	</Project>
 	<Project Path="settings_panel.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="1ec97974-cd7b-373e-9e22-33fbe23a6028">

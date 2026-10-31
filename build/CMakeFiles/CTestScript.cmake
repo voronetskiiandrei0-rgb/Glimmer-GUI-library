@@ -9,7 +9,7 @@ set(CTEST_SOURCE_DIRECTORY "C:/Users/voron/OneDrive/Documents/GUIlibrary")
 set(CTEST_BINARY_DIRECTORY "C:/Users/voron/OneDrive/Documents/GUIlibrary/build")
 
 # CTest Update Step
-set(CTEST_UPDATE_COMMAND "")
+set(CTEST_UPDATE_COMMAND "C:/Program Files/Git/cmd/git.exe")
 set(CTEST_UPDATE_OPTIONS "")
 set(CTEST_UPDATE_VERSION_ONLY "")
 set(CTEST_NIGHTLY_START_TIME "00:00:00 EDT")
@@ -24,7 +24,7 @@ set(CTEST_SVN_OPTIONS "")
 set(CTEST_SVN_UPDATE_OPTIONS "")
 
 # Git options
-set(CTEST_GIT_COMMAND "")
+set(CTEST_GIT_COMMAND "C:/Program Files/Git/cmd/git.exe")
 set(CTEST_GIT_INIT_SUBMODULES "")
 set(CTEST_GIT_UPDATE_CUSTOM "")
 set(CTEST_GIT_UPDATE_OPTIONS "")
@@ -51,7 +51,7 @@ set(CTEST_TEST_TIMEOUT "1500")
 set(CTEST_TEST_COVERAGE_TOOL "")
 
 # CTest Coverage Step
-set(CTEST_COVERAGE_COMMAND "COVERAGE_COMMAND-NOTFOUND")
+set(CTEST_COVERAGE_COMMAND "C:/Users/voron/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/bin/gcov.exe")
 set(CTEST_COVERAGE_EXTRA_FLAGS "-l")
 
 # CTest MemCheck Step

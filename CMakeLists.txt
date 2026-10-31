@@ -12,6 +12,12 @@ add_library(glimmer INTERFACE)
 target_include_directories(glimmer INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_compile_features(glimmer INTERFACE cxx_std_17)
 
+
+
+# Your personal application
+add_executable(my_app test.cpp)
+target_link_libraries(my_app PRIVATE glimmer)
+
 add_executable(settings_panel examples/settings_panel.cpp)
 target_link_libraries(settings_panel PRIVATE glimmer)
 

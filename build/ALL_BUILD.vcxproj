@@ -182,6 +182,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{C8A25A18-66D4-3E4F-B7A7-A03DC9AA4309}</Project>
       <Name>glimmer_tests</Name>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\voron\OneDrive\Documents\GUIlibrary\build\my_app.vcxproj">
+      <Project>{F12780BD-3373-37E2-9BF8-BA2DF69605FE}</Project>
+      <Name>my_app</Name>
+    </ProjectReference>
     <ProjectReference Include="C:\Users\voron\OneDrive\Documents\GUIlibrary\build\settings_panel.vcxproj">
       <Project>{1EC97974-CD7B-373E-9E22-33FBE23A6028}</Project>
       <Name>settings_panel</Name>
