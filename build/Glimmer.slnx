@@ -10,7 +10,6 @@
 	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="959978b4-2a85-3a34-a8a2-9158a5109e25" DefaultStartup="true">
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
 		<BuildDependency Project="glimmer_live_demo.vcxproj"/>
-		<BuildDependency Project="glimmer_tests.vcxproj"/>
 		<BuildDependency Project="my_app.vcxproj"/>
 		<BuildDependency Project="settings_panel.vcxproj"/>
 		<Build Solution="Debug|*" Project="false"/>
@@ -18,46 +17,8 @@
 		<Build Solution="MinSizeRel|*" Project="false"/>
 		<Build Solution="RelWithDebInfo|*" Project="false"/>
 	</Project>
-	<Project Path="Continuous.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e0322332-1f59-3b41-b37d-bce92596cdb6">
-		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
-		<Build Solution="Debug|*" Project="false"/>
-		<Build Solution="Release|*" Project="false"/>
-		<Build Solution="MinSizeRel|*" Project="false"/>
-		<Build Solution="RelWithDebInfo|*" Project="false"/>
-	</Project>
-	<Project Path="Experimental.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="4d412c33-8184-347b-bbf0-624e7ceced3c">
-		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
-		<Build Solution="Debug|*" Project="false"/>
-		<Build Solution="Release|*" Project="false"/>
-		<Build Solution="MinSizeRel|*" Project="false"/>
-		<Build Solution="RelWithDebInfo|*" Project="false"/>
-	</Project>
-	<Project Path="Nightly.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="db1a81ab-227b-3589-a833-5971341dd5f9">
-		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
-		<Build Solution="Debug|*" Project="false"/>
-		<Build Solution="Release|*" Project="false"/>
-		<Build Solution="MinSizeRel|*" Project="false"/>
-		<Build Solution="RelWithDebInfo|*" Project="false"/>
-	</Project>
-	<Project Path="NightlyMemoryCheck.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="2afe34f2-a723-3d65-b943-14bc412c8130">
-		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
-		<Build Solution="Debug|*" Project="false"/>
-		<Build Solution="Release|*" Project="false"/>
-		<Build Solution="MinSizeRel|*" Project="false"/>
-		<Build Solution="RelWithDebInfo|*" Project="false"/>
-	</Project>
-	<Project Path="RUN_TESTS.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f0a1d898-2b77-3983-b0ba-a594856c697a">
-		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
-		<Build Solution="Debug|*" Project="false"/>
-		<Build Solution="Release|*" Project="false"/>
-		<Build Solution="MinSizeRel|*" Project="false"/>
-		<Build Solution="RelWithDebInfo|*" Project="false"/>
-	</Project>
 	<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="d1cc837a-811f-35df-a4a5-da9dcfc69e8c"/>
 	<Project Path="glimmer_live_demo.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="fd6541cb-0f82-3b69-89f7-ceb43123ead3">
-		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
-	</Project>
-	<Project Path="glimmer_tests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="c8a25a18-66d4-3e4f-b7a7-a03dc9aa4309">
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
 	</Project>
 	<Project Path="my_app.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f12780bd-3373-37e2-9bf8-ba2df69605fe">

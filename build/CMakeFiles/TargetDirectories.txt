@@ -1,11 +1,5 @@
-C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/Experimental.dir
-C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/Nightly.dir
-C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/Continuous.dir
-C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/NightlyMemoryCheck.dir
 C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/my_app.dir
 C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/settings_panel.dir
 C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/glimmer_live_demo.dir
-C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/glimmer_tests.dir
-C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/RUN_TESTS.dir
 C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/ALL_BUILD.dir
 C:/Users/voron/OneDrive/Documents/GUIlibrary/build/CMakeFiles/ZERO_CHECK.dir

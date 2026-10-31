@@ -14,9 +14,14 @@ target_compile_features(glimmer INTERFACE cxx_std_17)
 
 
 
-# Your personal application
-add_executable(my_app test.cpp)
-target_link_libraries(my_app PRIVATE glimmer)
+# Your personal application (Paint Tool - WIN32 subsystem, links Win32 APIs)
+if(WIN32)
+    add_executable(my_app WIN32 test.cpp)
+    target_link_libraries(my_app PRIVATE glimmer user32 gdi32)
+else()
+    add_executable(my_app test.cpp)
+    target_link_libraries(my_app PRIVATE glimmer)
+endif()
 
 add_executable(settings_panel examples/settings_panel.cpp)
 target_link_libraries(settings_panel PRIVATE glimmer)
