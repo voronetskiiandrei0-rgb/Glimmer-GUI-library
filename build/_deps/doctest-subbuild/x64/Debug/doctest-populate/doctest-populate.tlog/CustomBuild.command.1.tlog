@@ -1,0 +1,152 @@
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-MKDIR.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/tmp/doctest-populate-mkdirs.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-DOWNLOAD.RULE
+setlocal
+cd C:\Users\voron\OneDrive\Documents\GUIlibrary\build\_deps
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/download-doctest-populate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/verify-doctest-populate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/extract-doctest-populate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-UPDATE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-update
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-PATCH.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-CONFIGURE.RULE
+setlocal
+cd C:\Users\voron\OneDrive\Documents\GUIlibrary\build\_deps\doctest-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-BUILD.RULE
+setlocal
+cd C:\Users\voron\OneDrive\Documents\GUIlibrary\build\_deps\doctest-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-INSTALL.RULE
+setlocal
+cd C:\Users\voron\OneDrive\Documents\GUIlibrary\build\_deps\doctest-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\0572139854F55567A571186DEDB86972\DOCTEST-POPULATE-TEST.RULE
+setlocal
+cd C:\Users\voron\OneDrive\Documents\GUIlibrary\build\_deps\doctest-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\78AF1B6F76ABC1868A24086F7422EBB7\DOCTEST-POPULATE-COMPLETE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/CMakeFiles/Debug/doctest-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/Debug/doctest-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\F1EE37E2C4538CC4CBE4FF60DD82CC52\DOCTEST-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild -BC:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild --check-stamp-file C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

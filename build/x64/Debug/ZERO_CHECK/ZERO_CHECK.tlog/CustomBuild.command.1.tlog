@@ -1,0 +1,10 @@
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\CMAKEFILES\F97625B20EBA3FA7320F8E30B149126B\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/voron/OneDrive/Documents/GUIlibrary -BC:/Users/voron/OneDrive/Documents/GUIlibrary/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/voron/OneDrive/Documents/GUIlibrary/build/Glimmer.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

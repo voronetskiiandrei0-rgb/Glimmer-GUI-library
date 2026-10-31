@@ -1,0 +1,24 @@
+Start testing: Oct 31 16:15 GTB Standard Time
+----------------------------------------------------------
+1/1 Testing: glimmer_tests
+1/1 Test: glimmer_tests
+Command: "C:/Users/voron/OneDrive/Documents/GUIlibrary/build/Debug/glimmer_tests.exe"
+Directory: C:/Users/voron/OneDrive/Documents/GUIlibrary/build
+"glimmer_tests" start time: Oct 31 16:15 GTB Standard Time
+Output:
+----------------------------------------------------------
+[doctest] doctest version is "2.4.11"
+[doctest] run with "--help" for options
+===============================================================================
+[doctest] test cases:  122 |  122 passed | 0 failed | 0 skipped
+[doctest] assertions: 9947 | 9947 passed | 0 failed |
+[doctest] Status: SUCCESS!
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"glimmer_tests" end time: Oct 31 16:15 GTB Standard Time
+"glimmer_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 31 16:15 GTB Standard Time

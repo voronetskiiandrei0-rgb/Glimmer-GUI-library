@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\voron\OneDrive\Documents\GUIlibrary\build\CMakeFiles\f97625b20eba3fa7320f8e30b149126b\Continuous.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\voron\OneDrive\Documents\GUIlibrary\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\voron\OneDrive\Documents\GUIlibrary\build\CMakeFiles\Continuous" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{4C7BC828-FF1F-32DE-A9E1-B180B225BB18}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

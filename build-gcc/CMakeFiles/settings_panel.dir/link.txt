@@ -1,0 +1,1 @@
+/ucrt64/bin/g++.exe -Wall -Wextra -Wpedantic -Werror -Wl,--enable-auto-import CMakeFiles/settings_panel.dir/examples/settings_panel.cpp.o -o settings_panel.exe -Wl,--out-implib,libsettings_panel.dll.a -Wl,--major-image-version,0,--minor-image-version,0

@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/CMakeFiles/doctest-populate"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/CMakeFiles/doctest-populate.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/CMakeFiles/doctest-populate-complete.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-build.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-configure.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-download.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-install.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-mkdir.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-patch.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-test.rule"
+		},
+		{
+			"file" : "/c/Users/voron/OneDrive/Documents/GUIlibrary/build-gcc/_deps/doctest-subbuild/doctest-populate-prefix/src/doctest-populate-stamp/doctest-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"doctest-populate"
+		],
+		"name" : "doctest-populate"
+	}
+}

@@ -1,0 +1,1 @@
+/ucrt64/bin/g++.exe -Wall -Wextra -Wpedantic -Werror -Wl,--enable-auto-import CMakeFiles/glimmer_tests.dir/tests/test_glimmer.cpp.o -o glimmer_tests.exe -Wl,--out-implib,libglimmer_tests.dll.a -Wl,--major-image-version,0,--minor-image-version,0

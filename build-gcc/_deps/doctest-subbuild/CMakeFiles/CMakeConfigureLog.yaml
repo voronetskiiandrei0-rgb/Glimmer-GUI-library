@@ -1,0 +1,80 @@
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineSystem.cmake:12 (find_program)"
+      - "CMakeLists.txt:16 (project)"
+    mode: "program"
+    variable: "CMAKE_UNAME"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "uname"
+    candidate_directories:
+      - "/ucrt64/bin/"
+      - "/usr/bin/"
+      - "/c/WINDOWS/system32/"
+      - "/c/WINDOWS/"
+      - "/c/WINDOWS/System32/Wbem/"
+      - "/c/WINDOWS/System32/WindowsPowerShell/v1.0/"
+      - "/c/WINDOWS/System32/OpenSSH/"
+      - "/c/Program Files/CMake/bin/"
+      - "/c/Program Files/Microsoft SQL Server/170/Tools/Binn/"
+      - "/c/Program Files/Microsoft SQL Server/Client SDK/ODBC/170/Tools/Binn/"
+      - "/c/Program Files/dotnet/"
+      - "/c/Program Files (x86)/IncrediBuild/"
+      - "/c/Program Files (x86)/Windows Kits/10/Windows Performance Toolkit/"
+      - "/c/Program Files/Microsoft SQL Server/150/Tools/Binn/"
+      - "/c/Users/voron/AppData/Local/Programs/Python/Launcher/"
+      - "/c/Users/voron/AppData/Local/Microsoft/WindowsApps/"
+      - "/c/Program Files/JetBrains/CLion 2026.2.3.1/bin/"
+      - "/c/Users/voron/.dotnet/tools/"
+      - "/c/Users/voron/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "/c/Users/voron/AppData/Local/Programs/Microsoft VS Code/2a59476c9b/resources/app/node_modules.asar.unpacked/@vscode/ripgrep-universal/bin/win32-x64/"
+      - "/bin/"
+      - "/usr/local/bin/"
+    searched_directories:
+      - "/ucrt64/bin/uname.com"
+      - "/ucrt64/bin/uname.exe"
+      - "/ucrt64/bin/uname"
+      - "/usr/bin/uname.com"
+    found: "/usr/bin/uname.exe"
+    search_context:
+      ENV{PATH}:
+        - "/ucrt64/bin"
+        - "/usr/bin"
+        - "/c/WINDOWS/system32"
+        - "/c/WINDOWS"
+        - "/c/WINDOWS/System32/Wbem"
+        - "/c/WINDOWS/System32/WindowsPowerShell/v1.0"
+        - "/c/WINDOWS/System32/OpenSSH"
+        - "/c/Program Files/CMake/bin"
+        - "/c/Program Files/Microsoft SQL Server/170/Tools/Binn"
+        - "/c/Program Files/Microsoft SQL Server/Client SDK/ODBC/170/Tools/Binn"
+        - "/c/Program Files/dotnet"
+        - "/c/Program Files (x86)/IncrediBuild"
+        - "/c/Program Files (x86)/Windows Kits/10/Windows Performance Toolkit"
+        - "/c/Program Files/Microsoft SQL Server/150/Tools/Binn"
+        - "/c/Users/voron/AppData/Local/Programs/Python/Launcher"
+        - "/c/Users/voron/AppData/Local/Microsoft/WindowsApps"
+        - "/c/Program Files/JetBrains/CLion 2026.2.3.1/bin"
+        - "/c/Users/voron/.dotnet/tools"
+        - "/c/Users/voron/AppData/Local/Programs/Microsoft VS Code/bin"
+        - "/c/Users/voron/AppData/Local/Programs/Microsoft VS Code/2a59476c9b/resources/app/node_modules.asar.unpacked/@vscode/ripgrep-universal/bin/win32-x64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineSystem.cmake:218 (message)"
+      - "CMakeLists.txt:16 (project)"
+    message: |
+      The system is: MSYS - 3.6.10-c770e1b9.x86_64 - x86_64
+...

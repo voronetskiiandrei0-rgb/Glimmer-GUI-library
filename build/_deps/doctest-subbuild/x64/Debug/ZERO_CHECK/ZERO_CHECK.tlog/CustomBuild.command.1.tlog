@@ -1,0 +1,10 @@
+^C:\USERS\VORON\ONEDRIVE\DOCUMENTS\GUILIBRARY\BUILD\_DEPS\DOCTEST-SUBBUILD\CMAKEFILES\F1EE37E2C4538CC4CBE4FF60DD82CC52\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild -BC:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/voron/OneDrive/Documents/GUIlibrary/build/_deps/doctest-subbuild/doctest-populate.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
