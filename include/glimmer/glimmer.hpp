@@ -2625,6 +2625,8 @@ public:
         }
     }
     // Returns a read-only pointer to width times height packed pixels.
+    Surface& surface() { return surface_; }
+    const Surface& surface() const { return surface_; }
     const std::uint32_t* pixels() const { return surface_.pixels(); }
     // Returns the render target width.
     int width() const { return surface_.width(); }
