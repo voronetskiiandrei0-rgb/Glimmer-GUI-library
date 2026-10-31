@@ -1148,6 +1148,302 @@ public:
         clips_.push_back({0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_)});
     }
 
+    // 1. Draws a filled 5-point star centered at (cx, cy)
+    void draw_filled_star(float cx, float cy, float outer_radius, float inner_radius, std::uint32_t color) {
+        if (outer_radius <= 0.0f || inner_radius <= 0.0f) return;
+        std::array<float, 20> pts;
+        const double pi = 3.14159265358979323846;
+        for (int i = 0; i < 10; ++i) {
+            double angle = -pi * 0.5 + i * (pi / 5.0);
+            double r = (i % 2 == 0) ? outer_radius : inner_radius;
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + r * std::cos(angle));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + r * std::sin(angle));
+        }
+        draw_filled_polygon(pts.data(), 10U, color);
+    }
+
+    // 2. Draws a 5-point star outline centered at (cx, cy)
+    void draw_star_outline(float cx, float cy, float outer_radius, float inner_radius, std::uint32_t color, float thickness = 1.0f) {
+        if (outer_radius <= 0.0f || inner_radius <= 0.0f) return;
+        std::array<float, 20> pts;
+        const double pi = 3.14159265358979323846;
+        for (int i = 0; i < 10; ++i) {
+            double angle = -pi * 0.5 + i * (pi / 5.0);
+            double r = (i % 2 == 0) ? outer_radius : inner_radius;
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + r * std::cos(angle));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + r * std::sin(angle));
+        }
+        draw_polygon_outline(pts.data(), 10U, color, thickness);
+    }
+
+    // 3. Draws a diamond / rhombus polygon fill
+    void draw_filled_diamond(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        const float mx = rect.x + rect.w * 0.5f;
+        const float my = rect.y + rect.h * 0.5f;
+        const std::array<float, 8> pts{{
+            mx, rect.y,
+            rect.x + rect.w, my,
+            mx, rect.y + rect.h,
+            rect.x, my
+        }};
+        draw_filled_polygon(pts.data(), 4U, color);
+    }
+
+    // 4. Draws a diamond / rhombus outline
+    void draw_diamond_outline(Rect rect, std::uint32_t color, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        const float mx = rect.x + rect.w * 0.5f;
+        const float my = rect.y + rect.h * 0.5f;
+        const std::array<float, 8> pts{{
+            mx, rect.y,
+            rect.x + rect.w, my,
+            mx, rect.y + rect.h,
+            rect.x, my
+        }};
+        draw_polygon_outline(pts.data(), 4U, color, thickness);
+    }
+
+    // 5. Draws an arrow outline (shaft + head)
+    void draw_arrow_outline(Rect rect, int direction, std::uint32_t color, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x0 = rect.x, y0 = rect.y, w = rect.w, h = rect.h;
+        float mx = x0 + w * 0.5f, my = y0 + h * 0.5f;
+        switch (direction & 3) {
+            case 0: { // Right
+                const std::array<float, 14> pts{{
+                    x0, my - h * 0.2f,
+                    mx, my - h * 0.2f,
+                    mx, y0,
+                    x0 + w, my,
+                    mx, y0 + h,
+                    mx, my + h * 0.2f,
+                    x0, my + h * 0.2f
+                }};
+                draw_polygon_outline(pts.data(), 7U, color, thickness);
+                break;
+            }
+            case 1: { // Down
+                const std::array<float, 14> pts{{
+                    mx - w * 0.2f, y0,
+                    mx + w * 0.2f, y0,
+                    mx + w * 0.2f, my,
+                    x0 + w, my,
+                    mx, y0 + h,
+                    x0, my,
+                    mx - w * 0.2f, my
+                }};
+                draw_polygon_outline(pts.data(), 7U, color, thickness);
+                break;
+            }
+            case 2: { // Left
+                const std::array<float, 14> pts{{
+                    x0 + w, my - h * 0.2f,
+                    mx, my - h * 0.2f,
+                    mx, y0,
+                    x0, my,
+                    mx, y0 + h,
+                    mx, my + h * 0.2f,
+                    x0 + w, my + h * 0.2f
+                }};
+                draw_polygon_outline(pts.data(), 7U, color, thickness);
+                break;
+            }
+            case 3: { // Up
+                const std::array<float, 14> pts{{
+                    mx - w * 0.2f, y0 + h,
+                    mx + w * 0.2f, y0 + h,
+                    mx + w * 0.2f, my,
+                    x0 + w, my,
+                    mx, y0,
+                    x0, my,
+                    mx - w * 0.2f, my
+                }};
+                draw_polygon_outline(pts.data(), 7U, color, thickness);
+                break;
+            }
+        }
+    }
+
+    // 6. Draws a rounded callout speech bubble
+    void draw_speech_bubble(Rect rect, std::uint32_t color, bool outline_only = false, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        const float body_h = rect.h * 0.8f;
+        const Rect body_rect{rect.x, rect.y, rect.w, body_h};
+        if (outline_only) {
+            draw_rounded_rect_outline(body_rect, 6.0f, color, thickness);
+            draw_line(static_cast<int>(rect.x + rect.w * 0.25f), static_cast<int>(rect.y + body_h),
+                      static_cast<int>(rect.x + rect.w * 0.15f), static_cast<int>(rect.y + rect.h), color);
+            draw_line(static_cast<int>(rect.x + rect.w * 0.15f), static_cast<int>(rect.y + rect.h),
+                      static_cast<int>(rect.x + rect.w * 0.40f), static_cast<int>(rect.y + body_h), color);
+        } else {
+            draw_rounded_rect(body_rect, 6.0f, color);
+            draw_filled_triangle(rect.x + rect.w * 0.25f, rect.y + body_h,
+                                 rect.x + rect.w * 0.15f, rect.y + rect.h,
+                                 rect.x + rect.w * 0.40f, rect.y + body_h, color);
+        }
+    }
+
+    // 7. Draws an anti-aliased styled selection marquee / dashed rectangle
+    void draw_selection_marquee(Rect rect, std::uint32_t color1 = 0xFF000000U, std::uint32_t color2 = 0xFFFFFFFFU, int step = 4) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        int x0 = static_cast<int>(rect.x), y0 = static_cast<int>(rect.y);
+        int x1 = static_cast<int>(rect.x + rect.w), y1 = static_cast<int>(rect.y + rect.h);
+        draw_dashed_line(x0, y0, x1, y0, color1, step, step);
+        draw_dashed_line(x1, y0, x1, y1, color1, step, step);
+        draw_dashed_line(x1, y1, x0, y1, color1, step, step);
+        draw_dashed_line(x0, y1, x0, y0, color1, step, step);
+        draw_dashed_line(x0 + step, y0, x1, y0, color2, step, step);
+        draw_dashed_line(x1, y0 + step, x1, y1, color2, step, step);
+        draw_dashed_line(x1 - step, y1, x0, y1, color2, step, step);
+        draw_dashed_line(x0, y1 - step, x0, y0, color2, step, step);
+    }
+
+    // 8. Draws a circular color picker wheel gradient ring
+    void draw_color_wheel(int center_x, int center_y, int radius) {
+        if (radius <= 0) return;
+        const double pi = 3.14159265358979323846;
+        for (int y = -radius; y <= radius; ++y) {
+            for (int x = -radius; x <= radius; ++x) {
+                double dist = std::sqrt(x * x + y * y);
+                if (dist > radius || dist < radius * 0.5) continue;
+                double angle = std::atan2(y, x);
+                if (angle < 0.0) angle += 2.0 * pi;
+                double hue = angle / (2.0 * pi);
+                double r = std::clamp(std::abs(hue * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+                double g = std::clamp(2.0 - std::abs(hue * 6.0 - 2.0), 0.0, 1.0);
+                double b = std::clamp(2.0 - std::abs(hue * 6.0 - 4.0), 0.0, 1.0);
+                std::uint32_t col = 0xFF000000U |
+                    (static_cast<std::uint32_t>(r * 255.0) & 0xFFU) |
+                    ((static_cast<std::uint32_t>(g * 255.0) & 0xFFU) << 8U) |
+                    ((static_cast<std::uint32_t>(b * 255.0) & 0xFFU) << 16U);
+                if (inside_clip(center_x + x, center_y + y)) {
+                    blend_pixel(center_x + x, center_y + y, col);
+                }
+            }
+        }
+    }
+
+    // 9. Draws an icon glyph for Pencil (tip + body)
+    void draw_icon_pencil(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h;
+        draw_line(static_cast<int>(x + w * 0.2f), static_cast<int>(y + h * 0.8f),
+                  static_cast<int>(x + w * 0.8f), static_cast<int>(y + h * 0.2f), color);
+        draw_line(static_cast<int>(x + w * 0.3f), static_cast<int>(y + h * 0.9f),
+                  static_cast<int>(x + w * 0.9f), static_cast<int>(y + h * 0.3f), color);
+        draw_filled_triangle(x + w * 0.1f, y + h * 0.9f,
+                             x + w * 0.2f, y + h * 0.8f,
+                             x + w * 0.3f, y + h * 0.9f, color);
+    }
+
+    // 10. Draws an icon glyph for Paint Bucket / Fill
+    void draw_icon_bucket(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h;
+        draw_line(static_cast<int>(x + w * 0.3f), static_cast<int>(y + h * 0.3f),
+                  static_cast<int>(x + w * 0.6f), static_cast<int>(y + h * 0.2f), color);
+        draw_line(static_cast<int>(x + w * 0.3f), static_cast<int>(y + h * 0.3f),
+                  static_cast<int>(x + w * 0.5f), static_cast<int>(y + h * 0.8f), color);
+        draw_line(static_cast<int>(x + w * 0.6f), static_cast<int>(y + h * 0.2f),
+                  static_cast<int>(x + w * 0.8f), static_cast<int>(y + h * 0.7f), color);
+        draw_line(static_cast<int>(x + w * 0.5f), static_cast<int>(y + h * 0.8f),
+                  static_cast<int>(x + w * 0.8f), static_cast<int>(y + h * 0.7f), color);
+        draw_filled_circle(static_cast<int>(x + w * 0.2f), static_cast<int>(y + h * 0.6f), 2, color);
+    }
+
+    // 11. Draws an icon glyph for Eyedropper / Color Picker
+    void draw_icon_dropper(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h;
+        draw_line(static_cast<int>(x + w * 0.7f), static_cast<int>(y + h * 0.2f),
+                  static_cast<int>(x + w * 0.3f), static_cast<int>(y + h * 0.6f), color);
+        draw_line(static_cast<int>(x + w * 0.8f), static_cast<int>(y + h * 0.3f),
+                  static_cast<int>(x + w * 0.4f), static_cast<int>(y + h * 0.7f), color);
+        draw_filled_circle(static_cast<int>(x + w * 0.8f), static_cast<int>(y + h * 0.2f), 2, color);
+        draw_line(static_cast<int>(x + w * 0.3f), static_cast<int>(y + h * 0.6f),
+                  static_cast<int>(x + w * 0.2f), static_cast<int>(y + h * 0.8f), color);
+    }
+
+    // 12. Draws an icon glyph for Layers
+    void draw_icon_layers(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h;
+        draw_line(static_cast<int>(x + w*0.5f), static_cast<int>(y + h*0.2f),
+                  static_cast<int>(x + w*0.8f), static_cast<int>(y + h*0.35f), color);
+        draw_line(static_cast<int>(x + w*0.8f), static_cast<int>(y + h*0.35f),
+                  static_cast<int>(x + w*0.5f), static_cast<int>(y + h*0.5f), color);
+        draw_line(static_cast<int>(x + w*0.5f), static_cast<int>(y + h*0.5f),
+                  static_cast<int>(x + w*0.2f), static_cast<int>(y + h*0.35f), color);
+        draw_line(static_cast<int>(x + w*0.2f), static_cast<int>(y + h*0.35f),
+                  static_cast<int>(x + w*0.5f), static_cast<int>(y + h*0.2f), color);
+        draw_line(static_cast<int>(x + w*0.2f), static_cast<int>(y + h*0.55f),
+                  static_cast<int>(x + w*0.5f), static_cast<int>(y + h*0.7f), color);
+        draw_line(static_cast<int>(x + w*0.5f), static_cast<int>(y + h*0.7f),
+                  static_cast<int>(x + w*0.8f), static_cast<int>(y + h*0.55f), color);
+    }
+
+    // 13. Draws an icon glyph for Zoom Magnifier
+    void draw_icon_magnifier(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h;
+        int rad = static_cast<int>(std::min(w, h) * 0.28f);
+        int cx = static_cast<int>(x + w * 0.4f), cy = static_cast<int>(y + h * 0.4f);
+        draw_circle_outline(cx, cy, rad, color, 1);
+        draw_line(cx + rad, cy + rad, static_cast<int>(x + w * 0.85f), static_cast<int>(y + h * 0.85f), color);
+    }
+
+    // 14. Inverts the pixels inside the given rectangle
+    void invert_rect(Rect rect) {
+        const Rect clipped = detail::intersect(clips_.back(), rect);
+        const int left = std::max(0, static_cast<int>(std::floor(clipped.x)));
+        const int top = std::max(0, static_cast<int>(std::floor(clipped.y)));
+        const int right = std::min(width_, static_cast<int>(std::ceil(clipped.x + clipped.w)));
+        const int bottom = std::min(height_, static_cast<int>(std::ceil(clipped.y + clipped.h)));
+        for (int y = top; y < bottom; ++y) {
+            for (int x = left; x < right; ++x) {
+                std::size_t idx = static_cast<std::size_t>(y) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(x);
+                std::uint32_t p = pixels_[idx];
+                pixels_[idx] = (p & 0xFF000000U) | ((~p) & 0x00FFFFFFU);
+            }
+        }
+    }
+
+    // 15. Blurs the pixels inside rect using a box blur
+    void box_blur(Rect rect, int radius = 1) {
+        if (radius <= 0) return;
+        const Rect clipped = detail::intersect(clips_.back(), rect);
+        const int left = std::max(0, static_cast<int>(std::floor(clipped.x)));
+        const int top = std::max(0, static_cast<int>(std::floor(clipped.y)));
+        const int right = std::min(width_, static_cast<int>(std::ceil(clipped.x + clipped.w)));
+        const int bottom = std::min(height_, static_cast<int>(std::ceil(clipped.y + clipped.h)));
+        if (right <= left || bottom <= top) return;
+        std::vector<std::uint32_t> temp(pixels_);
+        for (int y = top; y < bottom; ++y) {
+            for (int x = left; x < right; ++x) {
+                std::uint32_t r = 0, g = 0, b = 0, a = 0;
+                int count = 0;
+                for (int dy = -radius; dy <= radius; ++dy) {
+                    int ny = std::clamp(y + dy, top, bottom - 1);
+                    for (int dx = -radius; dx <= radius; ++dx) {
+                        int nx = std::clamp(x + dx, left, right - 1);
+                        std::uint32_t p = temp[static_cast<std::size_t>(ny) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(nx)];
+                        r += (p & 0xFFU);
+                        g += ((p >> 8U) & 0xFFU);
+                        b += ((p >> 16U) & 0xFFU);
+                        a += ((p >> 24U) & 0xFFU);
+                        ++count;
+                    }
+                }
+                if (count > 0) {
+                    pixels_[static_cast<std::size_t>(y) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(x)] =
+                        ((r / count) & 0xFFU) | (((g / count) & 0xFFU) << 8U) |
+                        (((b / count) & 0xFFU) << 16U) | (((a / count) & 0xFFU) << 24U);
+                }
+            }
+        }
+    }
+
 private:
     void draw_path_outline(const float* vertices, std::size_t vertex_count,
                            std::uint32_t color, float thickness, bool closed) {
@@ -1315,16 +1611,59 @@ struct Theme {
     std::uint32_t title_bar     = 0xFF3D3D3DU;  // title bar (dimmed)
     // -- Text ---------------------------------------------------------------
     std::uint32_t text          = 0xFFE0E0E0U;  // near-white text
+    std::uint32_t text_disabled = 0xFF7A7A7AU;  // secondary/muted text
     // -- Accents & interactive -------------------------------------------
-    std::uint32_t accent        = 0xFF4F8FD4U;  // ImGui blue-ish accent
+    std::uint32_t accent        = 0xFF4F8FD4U;  // ImGui / Fluent blue-ish accent
+    std::uint32_t accent_hover  = 0xFF6AA7EEU;  // accent hover state
     std::uint32_t button        = 0xFF454545U;  // resting button
-    std::uint32_t button_hover  = 0xFF6060A0U;  // hovered button (purple-blue)
+    std::uint32_t button_hover  = 0xFF6060A0U;  // hovered button
     std::uint32_t button_active = 0xFF3D6FA8U;  // pressed button
     std::uint32_t border        = 0xFF555555U;  // subtle border
-    // -- Spacing & font ----------------------------------------------------
+    std::uint32_t ribbon_bg     = 0xFF262626U;  // ribbon/toolbar background
+    std::uint32_t ribbon_card   = 0xFF2F2F2FU;  // ribbon tool card / group fill
+    // -- Spacing & styling -------------------------------------------------
     int padding                 = 6;
     int font_scale              = 1;
+    float corner_radius         = 4.0f;         // rounded corner styling (Win11/Fluent)
     std::size_t tooltip_delay_frames = 20U;
+
+    static Theme make_fluent_light() {
+        Theme t;
+        t.background    = 0xFFF3F3F3U;
+        t.window        = 0xFFFFFFFFU;
+        t.title_bar     = 0xFFEAEAEAU;
+        t.text          = 0xFF1A1A1AU;
+        t.text_disabled = 0xFF8A8A8AU;
+        t.accent        = 0xFF0067C0U;
+        t.accent_hover  = 0xFF1979CCU;
+        t.button        = 0xFFFBFBFBU;
+        t.button_hover  = 0xFFF0F0F0U;
+        t.button_active = 0xFFE5E5E5U;
+        t.border        = 0xFFE0E0E0U;
+        t.ribbon_bg     = 0xFFF7F7F7U;
+        t.ribbon_card   = 0xFFFFFFFFU;
+        t.corner_radius = 5.0f;
+        return t;
+    }
+
+    static Theme make_fluent_dark() {
+        Theme t;
+        t.background    = 0xFF202020U;
+        t.window        = 0xFF2C2C2CU;
+        t.title_bar     = 0xFF242424U;
+        t.text          = 0xFFF0F0F0U;
+        t.text_disabled = 0xFF7A7A7AU;
+        t.accent        = 0xFF4CC2FFU;
+        t.accent_hover  = 0xFF6DD2FFU;
+        t.button        = 0xFF383838U;
+        t.button_hover  = 0xFF444444U;
+        t.button_active = 0xFF2E2E2EU;
+        t.border        = 0xFF4A4A4AU;
+        t.ribbon_bg     = 0xFF252525U;
+        t.ribbon_card   = 0xFF303030U;
+        t.corner_radius = 5.0f;
+        return t;
+    }
 };
 
 // Caller-owned position and pointer state for a draggable window.
@@ -4059,6 +4398,422 @@ public:
     // Returns current font scale multiplier.
     int scale() const {
         return theme_.font_scale;
+    }
+
+    // 16. Sets the active theme directly
+    void set_theme(const Theme& new_theme) {
+        theme_ = new_theme;
+    }
+
+    // 17. Begins a horizontal ribbon bar across the top of the interface
+    void begin_ribbon(float height = 90.0f) {
+        clear_last_widget();
+        const Rect ribbon_rect{0.0f, 0.0f, root_.w, height};
+        surface_.fill_rect(ribbon_rect, theme_.ribbon_bg);
+        surface_.draw_line(0, static_cast<int>(height), static_cast<int>(root_.w), static_cast<int>(height), theme_.border);
+        cursor_x_ = static_cast<float>(theme_.padding);
+        cursor_y_ = 28.0f;
+        content_width_ = root_.w - 2.0f * static_cast<float>(theme_.padding);
+    }
+
+    // 18. Ends the horizontal ribbon bar
+    void end_ribbon() {
+        cursor_x_ = static_cast<float>(theme_.padding);
+        cursor_y_ = static_cast<float>(theme_.padding);
+    }
+
+    // 19. Draws a grouped card container inside a ribbon or toolbar
+    void begin_ribbon_group(const std::string& title, float width = 120.0f, float height = 80.0f) {
+        clear_last_widget();
+        const Rect rect{cursor_x_, cursor_y_, width, height};
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, theme_.ribbon_card);
+        surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.border, 1.0f);
+        const int font_sc = std::max(1, theme_.font_scale);
+        const Rect text_sz = surface_.measure_text(title, font_sc);
+        int tx = static_cast<int>(rect.x + (rect.w - text_sz.w) * 0.5f);
+        int ty = static_cast<int>(rect.y + rect.h - 14.0f);
+        surface_.draw_text(tx, ty, title, theme_.text_disabled, font_sc);
+    }
+
+    // 20. Advances past the current ribbon group card
+    void end_ribbon_group(float width = 120.0f) {
+        cursor_x_ += width + static_cast<float>(theme_.padding);
+    }
+
+    // 21. Draws a modern icon button with optional selected/active state
+    Interaction tool_button(const std::string& id_text, const std::string& label_text, bool selected = false, float size = 32.0f) {
+        const std::uint64_t id = widget_id(id_text);
+        const Rect rect = allocate(size);
+        const Interaction res = interact(id, rect);
+        std::uint32_t bg = selected ? theme_.accent :
+                           res.active ? theme_.button_active :
+                           res.hovered ? theme_.button_hover : theme_.button;
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, bg);
+        if (selected) {
+            surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.accent_hover, 1.0f);
+        }
+        int tx = static_cast<int>(rect.x + theme_.padding);
+        int ty = static_cast<int>(rect.y + (rect.h - 16.0f) * 0.5f);
+        surface_.draw_text(tx, ty, label_text, selected ? 0xFFFFFFFFU : theme_.text, theme_.font_scale);
+        draw_focus(id, rect);
+        return res;
+    }
+
+    // 22. Draws a horizontal scrollbar and updates caller scroll offset
+    Interaction horizontal_scrollbar(const std::string& id_text, float& offset, float visible_extent, float total_extent, float height = 12.0f) {
+        const std::uint64_t id = widget_id(id_text);
+        const Rect track = allocate(height);
+        surface_.fill_rect(track, theme_.button);
+        if (total_extent <= visible_extent || total_extent <= 0.0f) return {};
+        float thumb_ratio = std::clamp(visible_extent / total_extent, 0.1f, 1.0f);
+        float thumb_w = track.w * thumb_ratio;
+        float max_offset = total_extent - visible_extent;
+        float thumb_x = track.x + (track.w - thumb_w) * std::clamp(offset / max_offset, 0.0f, 1.0f);
+        Rect thumb{thumb_x, track.y, thumb_w, track.h};
+        Interaction res = interact(id, track);
+        if (res.active && track.w > thumb_w) {
+            float rel_x = static_cast<float>(mouse_x_) - track.x - thumb_w * 0.5f;
+            offset = std::clamp(rel_x / (track.w - thumb_w), 0.0f, 1.0f) * max_offset;
+            res.changed = true;
+        }
+        surface_.draw_rounded_rect(thumb, 3.0f, res.active ? theme_.accent : res.hovered ? theme_.button_hover : theme_.border);
+        return res;
+    }
+
+    // 23. Draws a vertical scrollbar and updates caller scroll offset
+    Interaction vertical_scrollbar(const std::string& id_text, Rect track, float& offset, float visible_extent, float total_extent) {
+        const std::uint64_t id = widget_id(id_text);
+        surface_.fill_rect(track, theme_.button);
+        if (total_extent <= visible_extent || total_extent <= 0.0f) return {};
+        float thumb_ratio = std::clamp(visible_extent / total_extent, 0.1f, 1.0f);
+        float thumb_h = track.h * thumb_ratio;
+        float max_offset = total_extent - visible_extent;
+        float thumb_y = track.y + (track.h - thumb_h) * std::clamp(offset / max_offset, 0.0f, 1.0f);
+        Rect thumb{track.x, thumb_y, track.w, thumb_h};
+        Interaction res = interact(id, track);
+        if (res.active && track.h > thumb_h) {
+            float rel_y = static_cast<float>(mouse_y_) - track.y - thumb_h * 0.5f;
+            offset = std::clamp(rel_y / (track.h - thumb_h), 0.0f, 1.0f) * max_offset;
+            res.changed = true;
+        }
+        surface_.draw_rounded_rect(thumb, 3.0f, res.active ? theme_.accent : res.hovered ? theme_.button_hover : theme_.border);
+        return res;
+    }
+
+    // 24. Draws a floating canvas status zoom controller with - / + buttons and slider
+    Interaction zoom_slider(const std::string& id_text, float& zoom_percent, float min_zoom = 10.0f, float max_zoom = 800.0f) {
+        clear_last_widget();
+        const Rect rect = allocate(22.0f);
+        const float btn_w = 20.0f;
+        Rect minus_rect{rect.x, rect.y, btn_w, rect.h};
+        Rect plus_rect{rect.x + rect.w - btn_w, rect.y, btn_w, rect.h};
+        Rect slider_rect{rect.x + btn_w + 4.0f, rect.y, rect.w - 2.0f * btn_w - 8.0f, rect.h};
+
+        std::uint64_t m_id = widget_id(id_text + "_minus");
+        Interaction m_res = interact(m_id, minus_rect);
+        if (m_res.clicked) zoom_percent = std::max(min_zoom, zoom_percent - 10.0f);
+        surface_.draw_rounded_rect(minus_rect, 3.0f, m_res.active ? theme_.button_active : theme_.button);
+        surface_.draw_text(static_cast<int>(minus_rect.x + 6), static_cast<int>(minus_rect.y + 3), "-", theme_.text);
+
+        std::uint64_t p_id = widget_id(id_text + "_plus");
+        Interaction p_res = interact(p_id, plus_rect);
+        if (p_res.clicked) zoom_percent = std::min(max_zoom, zoom_percent + 10.0f);
+        surface_.draw_rounded_rect(plus_rect, 3.0f, p_res.active ? theme_.button_active : theme_.button);
+        surface_.draw_text(static_cast<int>(plus_rect.x + 6), static_cast<int>(plus_rect.y + 3), "+", theme_.text);
+
+        std::uint64_t s_id = widget_id(id_text + "_track");
+        Interaction s_res = interact(s_id, slider_rect);
+        float track_y = slider_rect.y + slider_rect.h * 0.5f;
+        surface_.draw_line(static_cast<int>(slider_rect.x), static_cast<int>(track_y),
+                           static_cast<int>(slider_rect.x + slider_rect.w), static_cast<int>(track_y), theme_.border);
+        float t = std::clamp((zoom_percent - min_zoom) / (max_zoom - min_zoom), 0.0f, 1.0f);
+        if (s_res.active && slider_rect.w > 0.0f) {
+            float mx = std::clamp((static_cast<float>(mouse_x_) - slider_rect.x) / slider_rect.w, 0.0f, 1.0f);
+            zoom_percent = min_zoom + mx * (max_zoom - min_zoom);
+            s_res.changed = true;
+        }
+        float thumb_x = slider_rect.x + t * slider_rect.w;
+        surface_.draw_filled_circle(static_cast<int>(thumb_x), static_cast<int>(track_y), 4, theme_.accent);
+        return s_res;
+    }
+
+    // 25. Draws a circular color button swatch
+    Interaction color_circle_button(const std::string& id_text, std::uint32_t color, bool selected = false, float diameter = 24.0f) {
+        const std::uint64_t id = widget_id(id_text);
+        const Rect rect = allocate(diameter);
+        const Interaction res = interact(id, rect);
+        int cx = static_cast<int>(rect.x + diameter * 0.5f);
+        int cy = static_cast<int>(rect.y + diameter * 0.5f);
+        int rad = static_cast<int>(diameter * 0.5f);
+        surface_.draw_filled_circle(cx, cy, rad, color);
+        surface_.draw_circle_outline(cx, cy, rad, selected ? theme_.accent : theme_.border, selected ? 2 : 1);
+        return res;
+    }
+
+    // 26. Draws a shape palette grid selector (returns clicked shape index or -1)
+    int shape_picker_grid(const std::string& id_text, int selected_idx, int shape_count = 12, int cols = 6) {
+        clear_last_widget();
+        int clicked_shape = -1;
+        float item_size = 26.0f;
+        int rows = (shape_count + cols - 1) / cols;
+        for (int r = 0; r < rows; ++r) {
+            const Rect row_rect = allocate(item_size + 2.0f);
+            for (int c = 0; c < cols; ++c) {
+                int idx = r * cols + c;
+                if (idx >= shape_count) break;
+                Rect cell{row_rect.x + c * (item_size + 4.0f), row_rect.y, item_size, item_size};
+                std::uint64_t cell_id = widget_id(id_text + "_" + std::to_string(idx));
+                Interaction cell_res = interact(cell_id, cell);
+                if (cell_res.clicked) clicked_shape = idx;
+                bool is_sel = (idx == selected_idx);
+                surface_.draw_rounded_rect(cell, 3.0f, is_sel ? theme_.accent : cell_res.hovered ? theme_.button_hover : theme_.button);
+                surface_.draw_rounded_rect_outline(cell, 3.0f, is_sel ? theme_.accent_hover : theme_.border, 1.0f);
+                Rect inner{cell.x + 4.0f, cell.y + 4.0f, cell.w - 8.0f, cell.h - 8.0f};
+                if (idx == 0) surface_.draw_line(static_cast<int>(inner.x), static_cast<int>(inner.y + inner.h), static_cast<int>(inner.x + inner.w), static_cast<int>(inner.y), theme_.text);
+                else if (idx == 1) surface_.draw_circle_outline(static_cast<int>(inner.x + inner.w*0.5f), static_cast<int>(inner.y + inner.h*0.5f), static_cast<int>(inner.w*0.5f), theme_.text, 1);
+                else if (idx == 2) surface_.outline_rect(inner, theme_.text, 1.0f);
+                else if (idx == 3) surface_.draw_rounded_rect_outline(inner, 3.0f, theme_.text, 1.0f);
+                else if (idx == 4) surface_.draw_triangle_outline(inner.x + inner.w*0.5f, inner.y, inner.x + inner.w, inner.y + inner.h, inner.x, inner.y + inner.h, theme_.text, 1.0f);
+                else if (idx == 5) surface_.draw_diamond_outline(inner, theme_.text, 1.0f);
+                else if (idx == 6) surface_.draw_arrow(inner, 0, theme_.text);
+                else if (idx == 7) surface_.draw_arrow(inner, 1, theme_.text);
+                else if (idx == 8) surface_.draw_star_outline(inner.x + inner.w*0.5f, inner.y + inner.h*0.5f, inner.w*0.5f, inner.w*0.25f, theme_.text, 1.0f);
+                else if (idx == 9) surface_.draw_speech_bubble(inner, theme_.text, true, 1.0f);
+            }
+        }
+        return clicked_shape;
+    }
+
+    // 27. Draws a brush thickness picker preset selector
+    int brush_size_presets(const std::string& id_text, int current_size) {
+        clear_last_widget();
+        int chosen_size = current_size;
+        const std::array<int, 4> presets = {1, 3, 8, 16};
+        const Rect row_rect = allocate(28.0f);
+        float item_w = 32.0f;
+        for (std::size_t i = 0; i < presets.size(); ++i) {
+            Rect cell{row_rect.x + static_cast<float>(i) * (item_w + 4.0f), row_rect.y, item_w, row_rect.h};
+            std::uint64_t b_id = widget_id(id_text + "_" + std::to_string(i));
+            Interaction b_res = interact(b_id, cell);
+            if (b_res.clicked) chosen_size = presets[i];
+            bool sel = (presets[i] == current_size);
+            surface_.draw_rounded_rect(cell, 3.0f, sel ? theme_.accent : b_res.hovered ? theme_.button_hover : theme_.button);
+            int cy = static_cast<int>(cell.y + cell.h * 0.5f);
+            int cx = static_cast<int>(cell.x + cell.w * 0.5f);
+            surface_.draw_filled_circle(cx, cy, std::max(1, presets[i] / 2), sel ? 0xFFFFFFFFU : theme_.text);
+        }
+        return chosen_size;
+    }
+
+    // 28. Draws an interactive Layer item row (visibility checkbox, title, active selection)
+    Interaction layer_row(const std::string& id_text, const std::string& title, bool& visible, bool selected = false) {
+        const std::uint64_t id = widget_id(id_text);
+        const Rect rect = allocate(26.0f);
+        const Interaction res = interact(id, rect);
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, selected ? theme_.accent : res.hovered ? theme_.button_hover : theme_.window);
+        Rect eye_rect{rect.x + 4.0f, rect.y + 5.0f, 16.0f, 16.0f};
+        surface_.draw_circle_outline(static_cast<int>(eye_rect.x + 8), static_cast<int>(eye_rect.y + 8), 6, visible ? theme_.text : theme_.text_disabled, 1);
+        if (visible) surface_.draw_filled_circle(static_cast<int>(eye_rect.x + 8), static_cast<int>(eye_rect.y + 8), 2, theme_.accent);
+        surface_.draw_text(static_cast<int>(rect.x + 26.0f), static_cast<int>(rect.y + 5.0f), title, selected ? 0xFFFFFFFFU : theme_.text, theme_.font_scale);
+        return res;
+    }
+
+    // 29. Draws a drop-down menu button in the ribbon top bar
+    Interaction menu_dropdown_button(const std::string& title, bool& open) {
+        const std::uint64_t id = widget_id(title);
+        const int font_sc = std::max(1, theme_.font_scale);
+        const Rect sz = surface_.measure_text(title, font_sc);
+        const Rect rect{cursor_x_, 4.0f, sz.w + 14.0f, 20.0f};
+        cursor_x_ += rect.w + 4.0f;
+        const Interaction res = interact(id, rect);
+        if (res.clicked) open = !open;
+        if (open || res.hovered) {
+            surface_.draw_rounded_rect(rect, 3.0f, open ? theme_.button_active : theme_.button_hover);
+        }
+        surface_.draw_text(static_cast<int>(rect.x + 7.0f), static_cast<int>(rect.y + 2.0f), title, theme_.text, font_sc);
+        return res;
+    }
+
+    // 30. Draws a breadcrumb / path indicator strip
+    void breadcrumb(const std::vector<std::string>& path_segments) {
+        clear_last_widget();
+        const Rect rect = allocate(20.0f);
+        float cur_x = rect.x;
+        const int font_sc = std::max(1, theme_.font_scale);
+        for (std::size_t i = 0; i < path_segments.size(); ++i) {
+            surface_.draw_text(static_cast<int>(cur_x), static_cast<int>(rect.y + 2.0f), path_segments[i],
+                               (i + 1 == path_segments.size()) ? theme_.text : theme_.accent, font_sc);
+            Rect sz = surface_.measure_text(path_segments[i], font_sc);
+            cur_x += sz.w + 4.0f;
+            if (i + 1 < path_segments.size()) {
+                surface_.draw_text(static_cast<int>(cur_x), static_cast<int>(rect.y + 2.0f), ">", theme_.text_disabled, font_sc);
+                cur_x += 12.0f;
+            }
+        }
+    }
+
+    // 31. Draws an info badge with pill background
+    void badge(const std::string& text, std::uint32_t bg_color) {
+        clear_last_widget();
+        const int font_sc = std::max(1, theme_.font_scale);
+        const Rect sz = surface_.measure_text(text, font_sc);
+        const Rect rect = allocate(sz.h + 6.0f);
+        Rect pill{rect.x, rect.y, sz.w + 12.0f, rect.h};
+        surface_.draw_rounded_rect(pill, rect.h * 0.5f, bg_color);
+        surface_.draw_text(static_cast<int>(pill.x + 6.0f), static_cast<int>(pill.y + 3.0f), text, 0xFFFFFFFFU, font_sc);
+    }
+
+    // 32. Draws a modern segmented button toggle group
+    int segmented_button(const std::string& id_text, const std::vector<std::string>& options, int selected_idx) {
+        clear_last_widget();
+        const Rect rect = allocate(26.0f);
+        if (options.empty()) return selected_idx;
+        float opt_w = rect.w / static_cast<float>(options.size());
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, theme_.window);
+        surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.border, 1.0f);
+        int result = selected_idx;
+        const int font_sc = std::max(1, theme_.font_scale);
+        for (std::size_t i = 0; i < options.size(); ++i) {
+            Rect opt_rect{rect.x + static_cast<float>(i) * opt_w, rect.y, opt_w, rect.h};
+            std::uint64_t opt_id = widget_id(id_text + "_" + std::to_string(i));
+            Interaction res = interact(opt_id, opt_rect);
+            if (res.clicked) result = static_cast<int>(i);
+            bool is_sel = (result == static_cast<int>(i));
+            if (is_sel) {
+                surface_.draw_rounded_rect(opt_rect, theme_.corner_radius, theme_.accent);
+            } else if (res.hovered) {
+                surface_.draw_rounded_rect(opt_rect, theme_.corner_radius, theme_.button_hover);
+            }
+            const Rect sz = surface_.measure_text(options[i], font_sc);
+            int tx = static_cast<int>(opt_rect.x + (opt_rect.w - sz.w) * 0.5f);
+            int ty = static_cast<int>(opt_rect.y + (opt_rect.h - sz.h) * 0.5f);
+            surface_.draw_text(tx, ty, options[i], is_sel ? 0xFFFFFFFFU : theme_.text, font_sc);
+            if (i > 0) {
+                surface_.draw_line(static_cast<int>(opt_rect.x), static_cast<int>(rect.y),
+                                   static_cast<int>(opt_rect.x), static_cast<int>(rect.y + rect.h), theme_.border);
+            }
+        }
+        return result;
+    }
+
+    // 33. Draws a numeric stepper with direct text value display
+    Interaction number_stepper(const std::string& label_text, int& val, int min_val = 0, int max_val = 100, int step_size = 1) {
+        clear_last_widget();
+        const Rect rect = allocate(26.0f);
+        surface_.draw_text(static_cast<int>(rect.x), static_cast<int>(rect.y + 5.0f), label_text, theme_.text, theme_.font_scale);
+        float right_x = rect.x + rect.w - 80.0f;
+        Rect minus_r{right_x, rect.y, 20.0f, rect.h};
+        Rect plus_r{right_x + 60.0f, rect.y, 20.0f, rect.h};
+        Rect val_r{right_x + 22.0f, rect.y, 36.0f, rect.h};
+
+        std::uint64_t m_id = widget_id(label_text + "_minus");
+        Interaction m_res = interact(m_id, minus_r);
+        if (m_res.clicked) val = std::max(min_val, val - step_size);
+        surface_.draw_rounded_rect(minus_r, 3.0f, m_res.active ? theme_.button_active : theme_.button);
+        surface_.draw_text(static_cast<int>(minus_r.x + 6), static_cast<int>(minus_r.y + 5), "-", theme_.text);
+
+        std::uint64_t p_id = widget_id(label_text + "_plus");
+        Interaction p_res = interact(p_id, plus_r);
+        if (p_res.clicked) val = std::min(max_val, val + step_size);
+        surface_.draw_rounded_rect(plus_r, 3.0f, p_res.active ? theme_.button_active : theme_.button);
+        surface_.draw_text(static_cast<int>(plus_r.x + 6), static_cast<int>(plus_r.y + 5), "+", theme_.text);
+
+        surface_.fill_rect(val_r, theme_.window);
+        std::string s = std::to_string(val);
+        surface_.draw_text(static_cast<int>(val_r.x + 6), static_cast<int>(val_r.y + 5), s, theme_.text);
+        return m_res.clicked || p_res.clicked ? (m_res.clicked ? m_res : p_res) : Interaction{};
+    }
+
+    // 34. Draws an expandable collapsible sidebar section with smooth title bar
+    bool begin_section(const std::string& title, bool& is_open) {
+        clear_last_widget();
+        const Rect header = allocate(24.0f);
+        std::uint64_t id = widget_id(title);
+        Interaction res = interact(id, header);
+        if (res.clicked) is_open = !is_open;
+        surface_.draw_rounded_rect(header, theme_.corner_radius, res.hovered ? theme_.button_hover : theme_.title_bar);
+        surface_.draw_arrow(Rect{header.x + 6.0f, header.y + 6.0f, 12.0f, 12.0f}, is_open ? 1 : 0, theme_.accent);
+        surface_.draw_text(static_cast<int>(header.x + 24.0f), static_cast<int>(header.y + 4.0f), title, theme_.text, theme_.font_scale);
+        return is_open;
+    }
+
+    // 35. Ends an expandable collapsible sidebar section
+    void end_section() {
+        next_row(4.0f);
+    }
+
+    // 36. Draws a styled status message with icon bullet
+    void status_item(const std::string& label_text, const std::string& value_text, std::uint32_t bullet_color = 0xFF56B6C2U) {
+        clear_last_widget();
+        const Rect rect = allocate(20.0f);
+        surface_.draw_filled_circle(static_cast<int>(rect.x + 6), static_cast<int>(rect.y + 10), 3, bullet_color);
+        surface_.draw_text(static_cast<int>(rect.x + 16), static_cast<int>(rect.y + 2.0f), label_text + ": " + value_text, theme_.text, theme_.font_scale);
+    }
+
+    // 37. Draws an interactive canvas view navigator mini-map
+    void canvas_minimap(const Surface& full_canvas, Rect viewport_ratio) {
+        clear_last_widget();
+        const Rect map_rect = allocate(70.0f);
+        surface_.draw_image(full_canvas.pixels(), full_canvas.width(), full_canvas.height(), map_rect);
+        surface_.outline_rect(map_rect, theme_.border, 1.0f);
+        Rect box{map_rect.x + viewport_ratio.x * map_rect.w,
+                 map_rect.y + viewport_ratio.y * map_rect.h,
+                 std::max(4.0f, viewport_ratio.w * map_rect.w),
+                 std::max(4.0f, viewport_ratio.h * map_rect.h)};
+        surface_.draw_rounded_rect_outline(box, 2.0f, theme_.accent, 2.0f);
+    }
+
+    // 38. Draws a floating radial color picker popover
+    bool color_picker_radial(int cx, int cy, int radius, std::uint32_t& chosen_color) {
+        surface_.draw_color_wheel(cx, cy, radius);
+        if (mouse_down_) {
+            int dx = mouse_x_ - cx;
+            int dy = mouse_y_ - cy;
+            double dist = std::sqrt(dx * dx + dy * dy);
+            if (dist <= radius && dist >= radius * 0.5) {
+                const double pi = 3.14159265358979323846;
+                double angle = std::atan2(dy, dx);
+                if (angle < 0.0) angle += 2.0 * pi;
+                double hue = angle / (2.0 * pi);
+                double r = std::clamp(std::abs(hue * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+                double g = std::clamp(2.0 - std::abs(hue * 6.0 - 2.0), 0.0, 1.0);
+                double b = std::clamp(2.0 - std::abs(hue * 6.0 - 4.0), 0.0, 1.0);
+                chosen_color = 0xFF000000U |
+                    (static_cast<std::uint32_t>(r * 255.0) & 0xFFU) |
+                    ((static_cast<std::uint32_t>(g * 255.0) & 0xFFU) << 8U) |
+                    ((static_cast<std::uint32_t>(b * 255.0) & 0xFFU) << 16U);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 39. Draws a notification banner toast
+    void notification_banner(const std::string& message, std::uint32_t accent_bar_color = 0xFF4F8FD4U) {
+        clear_last_widget();
+        const Rect rect = allocate(32.0f);
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, theme_.window);
+        surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.border, 1.0f);
+        surface_.fill_rect({rect.x, rect.y, 4.0f, rect.h}, accent_bar_color);
+        surface_.draw_text(static_cast<int>(rect.x + 12.0f), static_cast<int>(rect.y + 8.0f), message, theme_.text, theme_.font_scale);
+    }
+
+    // 40. Draws a modern icon button with custom vector drawing lambda
+    template<typename DrawIconFn>
+    Interaction custom_icon_button(const std::string& id_text, DrawIconFn&& draw_icon, bool selected = false, float size = 32.0f) {
+        const std::uint64_t id = widget_id(id_text);
+        const Rect rect = allocate(size);
+        const Interaction res = interact(id, rect);
+        std::uint32_t bg = selected ? theme_.accent :
+                           res.active ? theme_.button_active :
+                           res.hovered ? theme_.button_hover : theme_.button;
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, bg);
+        if (selected) {
+            surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.accent_hover, 1.0f);
+        }
+        draw_icon(surface_, Rect{rect.x + 4.0f, rect.y + 4.0f, rect.w - 8.0f, rect.h - 8.0f}, selected ? 0xFFFFFFFFU : theme_.text);
+        draw_focus(id, rect);
+        return res;
     }
 
 private:

@@ -18,19 +18,20 @@
 #include <vector>
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Layout constants
+// Dynamic Window & Canvas dimensions
 // ─────────────────────────────────────────────────────────────────────────────
 namespace {
 
-constexpr int kWinW       = 1200;
-constexpr int kWinH       = 720;
-constexpr int kToolW      = 210;   // left tool panel
-constexpr int kStatusH    = 22;    // bottom status bar
-constexpr int kMenuH      = 30;    // top menu/toolbar strip
-constexpr int kCanvasX    = kToolW;
-constexpr int kCanvasY    = kMenuH;
-constexpr int kCanvasW    = kWinW - kToolW;
-constexpr int kCanvasH    = kWinH - kMenuH - kStatusH;
+int g_win_w       = 1200;
+int g_win_h       = 720;
+constexpr int kToolW      = 220;   // left tool panel width
+constexpr int kStatusH    = 24;    // bottom status bar height
+constexpr int kMenuH      = 32;    // top menu/toolbar strip height
+
+int canvas_x() { return kToolW; }
+int canvas_y() { return kMenuH; }
+int canvas_w() { return std::max(10, g_win_w - kToolW); }
+int canvas_h() { return std::max(10, g_win_h - kMenuH - kStatusH); }
 
 constexpr UINT_PTR kTimer = 1U;
 
@@ -61,7 +62,7 @@ const std::vector<std::string> kToolNames = {
     "Fill", "Color Pick",
 };
 
-// Colour palette (24-colour × 2 rows like classic Paint)
+// 24-colour palette (classic Paint style)
 const std::vector<std::uint32_t> kPalette = {
     0xFF000000U, 0xFF808080U, 0xFFFFFFFFU, 0xFFC0C0C0U,
     0xFF800000U, 0xFFFF0000U, 0xFF804000U, 0xFFFF8040U,
@@ -74,34 +75,11 @@ const std::vector<std::uint32_t> kPalette = {
 // ─────────────────────────────────────────────────────────────────────────────
 // App globals
 // ─────────────────────────────────────────────────────────────────────────────
+glm::Context g_ui(1200, 720);
+glm::Surface g_canvas(1200 - kToolW, 720 - kMenuH - kStatusH);
+glm::Surface g_preview(1200 - kToolW, 720 - kMenuH - kStatusH);
 
-// Glimmer context (full window)
-glm::Theme make_theme() {
-    glm::Theme t;
-    // slightly warmer dark to match the paint-tool aesthetic
-    t.background        = 0xFF232323U;
-    t.window            = 0xFF2D2D2DU;
-    t.title_bar         = 0xFF333333U;
-    t.text              = 0xFFDDDDDDU;
-    t.accent            = 0xFF4F8FD4U;
-    t.button            = 0xFF404040U;
-    t.button_hover      = 0xFF5568A0U;
-    t.button_active     = 0xFF3D6FA8U;
-    t.border            = 0xFF484848U;
-    t.padding           = 5;
-    t.font_scale        = 1;
-    t.tooltip_delay_frames = 20U;
-    return t;
-}
-glm::Context g_ui(kWinW, kWinH, make_theme());
-
-// The paint canvas surface
-glm::Surface g_canvas(kCanvasW, kCanvasH);
-glm::Surface g_preview(kCanvasW, kCanvasH);
-
-// DIB scratch buffer for Win32
-std::vector<std::uint32_t> g_dib(static_cast<std::size_t>(kWinW) *
-                                   static_cast<std::size_t>(kWinH));
+std::vector<std::uint32_t> g_dib;
 
 // Input
 int  g_mx = 0, g_my = 0;
@@ -113,14 +91,14 @@ int         g_tool_idx     = 0;
 std::uint32_t g_fg         = 0xFF000000U;
 std::uint32_t g_bg         = 0xFFFFFFFFU;
 std::size_t g_fg_pal       = 0U;
-std::size_t g_bg_pal       = 2U;
-float       g_size_f       = 3.0f;   // slider 1-40
+float       g_size_f       = 3.0f;
 int         g_size         = 3;
-float       g_opacity_f    = 1.0f;   // 0-1
+float       g_opacity_f    = 1.0f;
+int         g_ui_scale     = 1;
 
 // Drawing state
-int  g_px = -1, g_py = -1;    // previous canvas coords
-int  g_sx = 0,  g_sy = 0;     // shape start
+int  g_px = -1, g_py = -1;
+int  g_sx = 0,  g_sy = 0;
 bool g_drawing      = false;
 bool g_preview_live = false;
 
@@ -128,21 +106,13 @@ bool g_preview_live = false;
 constexpr std::size_t kMaxUndo = 30U;
 std::vector<std::vector<std::uint32_t>> g_undo, g_redo;
 
-// Status
+// Status & overlays
 std::string g_status = "Ready  |  Glimmer Paint";
-int         g_zoom   = 1;   // future: canvas zoom
-
-// Layer name (cosmetic, one layer for now)
-std::string g_layer_name = "Layer 1";
-
-// Recent colours (last 8 used)
-std::vector<std::uint32_t> g_recent_colors;
-
-// Mini-preview toggle in tool panel
 bool g_show_preview_panel = true;
-
-// Grid overlay
 bool g_show_grid = false;
+
+// Recent colours
+std::vector<std::uint32_t> g_recent_colors;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -177,17 +147,20 @@ void do_redo() {
 }
 
 void blit(glm::Surface& dst, const glm::Surface& src) {
-    std::memcpy(dst.pixels(), src.pixels(),
-                static_cast<std::size_t>(src.width()) *
-                static_cast<std::size_t>(src.height()) * sizeof(std::uint32_t));
+    const int copy_w = std::min(dst.width(), src.width());
+    const int copy_h = std::min(dst.height(), src.height());
+    for (int y = 0; y < copy_h; ++y) {
+        std::memcpy(dst.pixels() + y * dst.width(),
+                    src.pixels() + y * src.width(),
+                    copy_w * sizeof(std::uint32_t));
+    }
 }
 
 void clear_canvas(std::uint32_t color = 0xFFFFFFFFU) {
-    g_canvas.fill_rect({0, 0,
-        static_cast<float>(kCanvasW), static_cast<float>(kCanvasH)}, color);
+    g_canvas.fill_rect({0.0f, 0.0f,
+        static_cast<float>(g_canvas.width()), static_cast<float>(g_canvas.height())}, color);
 }
 
-// Push a colour into the recent list (deduplicate, cap at 8)
 void record_color(std::uint32_t c) {
     g_recent_colors.erase(
         std::remove(g_recent_colors.begin(), g_recent_colors.end(), c),
@@ -196,20 +169,17 @@ void record_color(std::uint32_t c) {
     if (g_recent_colors.size() > 8U) g_recent_colors.resize(8U);
 }
 
-// Canvas-local coords
-int cx() { return g_mx - kCanvasX; }
-int cy() { return g_my - kCanvasY; }
+int cx() { return g_mx - canvas_x(); }
+int cy() { return g_my - canvas_y(); }
 bool in_canvas() {
-    return cx() >= 0 && cy() >= 0 && cx() < kCanvasW && cy() < kCanvasH;
+    return cx() >= 0 && cy() >= 0 && cx() < canvas_w() && cy() < canvas_h();
 }
 
-// Stroke helpers
 void pencil_stroke(glm::Surface& s, int x0, int y0, int x1, int y1, std::uint32_t c) {
     s.draw_line(x0, y0, x1, y1, c);
 }
 
-void brush_stroke(glm::Surface& s, int x0, int y0, int x1, int y1,
-                   std::uint32_t c, int r) {
+void brush_stroke(glm::Surface& s, int x0, int y0, int x1, int y1, std::uint32_t c, int r) {
     int dx = x1 - x0, dy = y1 - y0;
     int steps = std::max(1, std::max(std::abs(dx), std::abs(dy)));
     for (int i = 0; i <= steps; ++i) {
@@ -218,9 +188,7 @@ void brush_stroke(glm::Surface& s, int x0, int y0, int x1, int y1,
 }
 
 void spray_stroke(glm::Surface& s, int cx2, int cy2, std::uint32_t c, int r) {
-    // scatter random-ish dots inside radius
     for (int i = 0; i < 20; ++i) {
-        // deterministic pseudo-random using frame counter mixed with i
         int rx = (((cx2 * 1103515245 + i * 12345 + 19) >> 4) % (2 * r + 1)) - r;
         int ry = (((cy2 * 1664525  + i * 6547  + 31) >> 3) % (2 * r + 1)) - r;
         if (rx * rx + ry * ry <= r * r) {
@@ -229,7 +197,6 @@ void spray_stroke(glm::Surface& s, int cx2, int cy2, std::uint32_t c, int r) {
     }
 }
 
-// Flood fill
 void flood_fill(int px2, int py2, std::uint32_t fill_c) {
     int w = g_canvas.width(), h = g_canvas.height();
     if (px2 < 0 || py2 < 0 || px2 >= w || py2 >= h) return;
@@ -252,7 +219,6 @@ void flood_fill(int px2, int py2, std::uint32_t fill_c) {
     }
 }
 
-// Shape commit helper
 void commit_shape(int ex, int ey) {
     float sx = static_cast<float>(g_sx), sy = static_cast<float>(g_sy);
     float efx = static_cast<float>(ex), efy = static_cast<float>(ey);
@@ -264,8 +230,7 @@ void commit_shape(int ex, int ey) {
             g_canvas.draw_line(g_sx, g_sy, ex, ey, g_fg);
             break;
         case Tool::Rectangle:
-            g_canvas.outline_rect({rx, ry, rw, rh}, g_fg,
-                                   static_cast<float>(std::max(1, g_size)));
+            g_canvas.outline_rect({rx, ry, rw, rh}, g_fg, static_cast<float>(std::max(1, g_size)));
             break;
         case Tool::FilledRect:
             g_canvas.fill_rect({rx, ry, rw, rh}, g_fg);
@@ -275,26 +240,22 @@ void commit_shape(int ex, int ey) {
                                                static_cast<float>(std::max(1, g_size)));
             break;
         case Tool::Circle: {
-            int rad = static_cast<int>(std::sqrt(
-                static_cast<float>((ex - g_sx)*(ex - g_sx) + (ey - g_sy)*(ey - g_sy))));
+            int rad = static_cast<int>(std::sqrt((ex - g_sx)*(ex - g_sx) + (ey - g_sy)*(ey - g_sy)));
             g_canvas.draw_circle_outline(g_sx, g_sy, rad, g_fg, std::max(1, g_size));
             break;
         }
         case Tool::FilledCircle: {
-            int rad = static_cast<int>(std::sqrt(
-                static_cast<float>((ex - g_sx)*(ex - g_sx) + (ey - g_sy)*(ey - g_sy))));
+            int rad = static_cast<int>(std::sqrt((ex - g_sx)*(ex - g_sx) + (ey - g_sy)*(ey - g_sy)));
             g_canvas.draw_filled_circle(g_sx, g_sy, rad, g_fg);
             break;
         }
         case Tool::Ellipse:
-            g_canvas.draw_ellipse_outline({rx, ry, rw, rh}, g_fg,
-                                           static_cast<float>(std::max(1, g_size)));
+            g_canvas.draw_ellipse_outline({rx, ry, rw, rh}, g_fg, static_cast<float>(std::max(1, g_size)));
             break;
         default: break;
     }
 }
 
-// Redraw preview shape on top of snapshot
 void update_preview(int ex, int ey) {
     if (!g_preview_live) return;
     blit(g_canvas, g_preview);
@@ -372,7 +333,6 @@ void canvas_move(int x, int y) {
 
 void canvas_up(int x, int y) {
     if (!g_drawing) return;
-    // Finalize shapes
     switch (g_tool) {
         case Tool::Line:
         case Tool::Rectangle:
@@ -391,30 +351,23 @@ void canvas_up(int x, int y) {
     }
     g_drawing = false;
     g_preview_live = false;
-    g_status = kToolNames[g_tool_idx] + "  |  " + std::to_string(x) + ", " + std::to_string(y);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Draw a pixel-art icon button for tool selection
-// ─────────────────────────────────────────────────────────────────────────────
-void draw_tool_grid(glm::Context& ui) {
-    const auto& theme = ui.theme();
-    // Draw 2-column tool grid
-    ui.begin_table("tools_table", 2U);
-    for (int i = 0; i < static_cast<int>(Tool::COUNT); ++i) {
-        bool sel = (g_tool_idx == i);
-        if (ui.selectable(kToolNames[static_cast<std::size_t>(i)], sel).clicked) {
-            g_tool_idx = i;
-            g_tool = static_cast<Tool>(i);
-        }
-        if (i % 2 == 0 && i + 1 < static_cast<int>(Tool::COUNT)) {
-            ui.next_table_column();
-        } else if (i % 2 == 1) {
-            ui.next_table_row();
-        }
-    }
-    ui.end_table();
-    (void)theme;
+void on_window_resize(int new_w, int new_h) {
+    if (new_w <= 0 || new_h <= 0) return;
+    g_win_w = new_w;
+    g_win_h = new_h;
+
+    // Use the library's Context::resize API!
+    g_ui.resize(g_win_w, g_win_h);
+
+    // Resize canvas surface preserving contents
+    const int cw = canvas_w();
+    const int ch = canvas_h();
+    g_canvas.resize(cw, ch);
+    g_preview.resize(cw, ch);
+
+    g_dib.resize(static_cast<std::size_t>(g_win_w) * static_cast<std::size_t>(g_win_h));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -423,166 +376,127 @@ void draw_tool_grid(glm::Context& ui) {
 void render_frame() {
     g_ui.begin(g_mx, g_my, g_ldown);
 
-    // ── Top menu bar ─────────────────────────────────────────────────────────
-    {
-        // Draw background manually at the surface level (the context owns the surface)
-        // We use a section_header-style call — but just draw as a themed row
-        // We do this by drawing a full-width row and putting buttons in it.
-        // Simulated via a fixed-height window at y=0
-        g_ui.window("##menubar", {0.0f, 0.0f,
-            static_cast<float>(kWinW), static_cast<float>(kMenuH)}, [&] {
-            // Inline layout: allocate columns manually
-            glm::Rect undo_r = g_ui.column(70.0f);
-            (void)undo_r;
-            if (g_ui.button("Undo").clicked) do_undo();
-            glm::Rect redo_r = g_ui.column(70.0f);
-            (void)redo_r;
-            if (g_ui.button("Redo").clicked) do_redo();
-            glm::Rect clear_r = g_ui.column(80.0f);
-            (void)clear_r;
-            if (g_ui.button("Clear").clicked) {
-                push_undo();
-                clear_canvas(g_bg);
-            }
-            glm::Rect grid_r = g_ui.column(80.0f);
-            (void)grid_r;
-            if (g_ui.button(g_show_grid ? "Grid ON" : "Grid OFF").clicked) {
-                g_show_grid = !g_show_grid;
-            }
-        });
-    }
+    // ── Top Menu Bar ─────────────────────────────────────────────────────────
+    g_ui.window("##menubar", {0.0f, 0.0f, static_cast<float>(g_win_w), static_cast<float>(kMenuH)}, [&] {
+        if (g_ui.button("Undo").clicked) do_undo();
+        if (g_ui.button("Redo").clicked) do_redo();
+        if (g_ui.button("Clear").clicked) {
+            push_undo();
+            clear_canvas(g_bg);
+        }
+        if (g_ui.button(g_show_grid ? "Grid: ON" : "Grid: OFF").clicked) {
+            g_show_grid = !g_show_grid;
+        }
+        if (g_ui.button("UI Scale: 1x").clicked) {
+            g_ui_scale = 1;
+            g_ui.set_scale(1);
+        }
+        if (g_ui.button("UI Scale: 2x").clicked) {
+            g_ui_scale = 2;
+            g_ui.set_scale(2);
+        }
+    });
 
-    // ── Tool panel (left) ─────────────────────────────────────────────────────
+    // ── Left Tool Panel ──────────────────────────────────────────────────────
     g_ui.window("##tools", {0.0f, static_cast<float>(kMenuH),
-                              static_cast<float>(kToolW),
-                              static_cast<float>(kWinH - kMenuH - kStatusH)}, [&] {
+                            static_cast<float>(kToolW),
+                            static_cast<float>(g_win_h - kMenuH - kStatusH)}, [&] {
 
-        // ---- Section: Tools ----
         g_ui.section_header("TOOLS");
-        g_ui.next_row(2.0f);
-        draw_tool_grid(g_ui);
+        g_ui.begin_table("tools_table", 2U);
+        for (int i = 0; i < static_cast<int>(Tool::COUNT); ++i) {
+            bool sel = (g_tool_idx == i);
+            if (g_ui.selectable(kToolNames[static_cast<std::size_t>(i)], sel).clicked) {
+                g_tool_idx = i;
+                g_tool = static_cast<Tool>(i);
+            }
+            if (i % 2 == 0 && i + 1 < static_cast<int>(Tool::COUNT)) {
+                g_ui.next_table_column();
+            } else if (i % 2 == 1) {
+                g_ui.next_table_row();
+            }
+        }
+        g_ui.end_table();
 
-        // ---- Section: Stroke ----
         g_ui.next_row(4.0f);
         g_ui.section_header("STROKE");
-        g_ui.label("Size");
+        g_ui.label("Brush Size: " + std::to_string(g_size) + " px");
         if (g_ui.slider("##size", g_size_f, 1.0f, 40.0f).changed) {
             g_size = static_cast<int>(g_size_f + 0.5f);
         }
-        g_ui.label("Size: " + std::to_string(g_size) + " px");
-        g_ui.label("Opacity");
-        g_ui.slider("##opacity", g_opacity_f, 0.0f, 1.0f);
 
-        // ---- Section: Colours ----
         g_ui.next_row(4.0f);
         g_ui.section_header("COLOURS");
-
-        // FG / BG swatches side by side
-        {
-            g_ui.begin_table("##swatches", 2U);
-            glm::Rect fg_r = g_ui.row(28.0f);
-            g_ui.image(&g_fg, 1, 1, fg_r);
-            g_ui.next_table_column();
-            glm::Rect bg_r = g_ui.row(28.0f);
-            g_ui.image(&g_bg, 1, 1, bg_r);
-            g_ui.end_table();
-        }
         g_ui.label("Foreground");
         g_ui.color_picker("##fgpick", g_fg);
         g_ui.label("Background");
         g_ui.color_picker("##bgpick", g_bg);
 
-        // ---- Section: Palette ----
         g_ui.next_row(4.0f);
         g_ui.section_header("PALETTE");
         g_ui.color_palette("##pal", kPalette, g_fg_pal, 6U);
         if (g_fg_pal < kPalette.size()) g_fg = kPalette[g_fg_pal];
 
-        // Recent colours
         if (!g_recent_colors.empty()) {
-            g_ui.label("Recent");
-            g_ui.color_palette("##recent", g_recent_colors,
-                                g_fg_pal /* reuse index, doesn't matter */, 8U);
+            g_ui.label("Recent Swatches");
+            g_ui.color_palette("##recent", g_recent_colors, g_fg_pal, 8U);
         }
 
-        // ---- Section: Canvas info ----
         g_ui.next_row(4.0f);
         g_ui.section_header("CANVAS");
-        g_ui.label(std::to_string(kCanvasW) + " x " + std::to_string(kCanvasH));
-        g_ui.label(g_layer_name);
-        g_ui.checkbox("Preview panel", g_show_preview_panel);
-        g_ui.checkbox("Grid overlay", g_show_grid);
+        g_ui.label("Size: " + std::to_string(canvas_w()) + "x" + std::to_string(canvas_h()));
+        g_ui.checkbox("Mini Preview", g_show_preview_panel);
 
-        // Mini canvas preview
-        if (g_show_preview_panel) {
+        if (g_show_preview_panel && canvas_w() > 0) {
             g_ui.next_row(4.0f);
-            g_ui.section_header("PREVIEW");
-            // Scale preview to fit panel width
-            float pw = static_cast<float>(kToolW - 10);
-            float ph = pw * static_cast<float>(kCanvasH) / static_cast<float>(kCanvasW);
+            g_ui.section_header("MINI PREVIEW");
+            float pw = static_cast<float>(kToolW - 14);
+            float ph = pw * static_cast<float>(canvas_h()) / static_cast<float>(canvas_w());
+            ph = std::min(ph, 110.0f);
             glm::Rect preview_r = g_ui.row(ph);
             g_ui.image(g_canvas, preview_r);
         }
-
-        // Undo / redo counts
-        g_ui.next_row(4.0f);
-        g_ui.section_header("HISTORY");
-        g_ui.label("Undo: " + std::to_string(g_undo.size()));
-        g_ui.label("Redo: " + std::to_string(g_redo.size()));
-        if (g_ui.button("Undo (Ctrl+Z)").clicked) do_undo();
-        if (g_ui.button("Redo (Ctrl+Y)").clicked) do_redo();
-        if (g_ui.button("Clear canvas").clicked) {
-            push_undo();
-            clear_canvas(g_bg);
-        }
     });
 
-    // ── Canvas area ───────────────────────────────────────────────────────────
+    // ── Paint Canvas ──────────────────────────────────────────────────────────
     {
         glm::Rect canvas_rect{
-            static_cast<float>(kCanvasX), static_cast<float>(kCanvasY),
-            static_cast<float>(kCanvasW), static_cast<float>(kCanvasH)
+            static_cast<float>(canvas_x()), static_cast<float>(canvas_y()),
+            static_cast<float>(canvas_w()), static_cast<float>(canvas_h())
         };
 
-        // Checkerboard beneath (shows for transparent pixel art usage)
-        // We blit the canvas on top of it
-        // First: fill with white background (canvas IS white normally)
         g_ui.draw_rect(canvas_rect, 0xFFFFFFFFU);
         g_ui.image(g_canvas, canvas_rect);
 
         // Grid overlay
         if (g_show_grid) {
-            const int step = 16;
-            for (int gx = kCanvasX; gx < kCanvasX + kCanvasW; gx += step) {
-                // Can't easily draw lines through Context without drawing into surface
-                // We'll rely on draw_rect with thin cols
-                g_ui.draw_rect({static_cast<float>(gx), static_cast<float>(kCanvasY),
-                                  1.0f, static_cast<float>(kCanvasH)}, 0x22FFFFFFU);
+            constexpr int step = 16;
+            for (int gx = canvas_x(); gx < canvas_x() + canvas_w(); gx += step) {
+                g_ui.draw_rect({static_cast<float>(gx), static_cast<float>(canvas_y()),
+                                1.0f, static_cast<float>(canvas_h())}, 0x22000000U);
             }
-            for (int gy = kCanvasY; gy < kCanvasY + kCanvasH; gy += step) {
-                g_ui.draw_rect({static_cast<float>(kCanvasX), static_cast<float>(gy),
-                                  static_cast<float>(kCanvasW), 1.0f}, 0x22FFFFFFU);
+            for (int gy = canvas_y(); gy < canvas_y() + canvas_h(); gy += step) {
+                g_ui.draw_rect({static_cast<float>(canvas_x()), static_cast<float>(gy),
+                                static_cast<float>(canvas_w()), 1.0f}, 0x22000000U);
             }
         }
 
-        // Cursor crosshair when in canvas
+        // Crosshair cursor
         if (in_canvas()) {
-            int mcx = g_mx, mcy = g_my;
-            g_ui.draw_rect({static_cast<float>(mcx - 6), static_cast<float>(mcy),
-                              12.0f, 1.0f}, 0xBB000000U);
-            g_ui.draw_rect({static_cast<float>(mcx), static_cast<float>(mcy - 6),
-                              1.0f, 12.0f}, 0xBB000000U);
+            g_ui.draw_rect({static_cast<float>(g_mx - 6), static_cast<float>(g_my), 12.0f, 1.0f}, 0xBB000000U);
+            g_ui.draw_rect({static_cast<float>(g_mx), static_cast<float>(g_my - 6), 1.0f, 12.0f}, 0xBB000000U);
         }
     }
 
-    // ── Status bar (bottom) ───────────────────────────────────────────────────
-    g_ui.window("##status", {0.0f, static_cast<float>(kWinH - kStatusH),
-                               static_cast<float>(kWinW),
-                               static_cast<float>(kStatusH)}, [&] {
+    // ── Status Bar ────────────────────────────────────────────────────────────
+    g_ui.window("##status", {0.0f, static_cast<float>(g_win_h - kStatusH),
+                            static_cast<float>(g_win_w), static_cast<float>(kStatusH)}, [&] {
         if (in_canvas()) {
             g_status = kToolNames[g_tool_idx] + "  |  " +
                        std::to_string(cx()) + ", " + std::to_string(cy()) +
-                       "  |  " + std::to_string(kCanvasW) + "x" + std::to_string(kCanvasH) +
+                       "  |  Canvas: " + std::to_string(canvas_w()) + "x" + std::to_string(canvas_h()) +
+                       "  |  Window: " + std::to_string(g_win_w) + "x" + std::to_string(g_win_h) +
+                       "  |  Scale: " + std::to_string(g_ui_scale) + "x" +
                        "  |  Undo: " + std::to_string(g_undo.size());
         }
         g_ui.label(g_status);
@@ -590,29 +504,31 @@ void render_frame() {
 
     g_ui.end();
 
-    // Convert AABBGGRR → GDI BBGGRR top-down
+    // DIB copy
     const std::uint32_t* src = g_ui.pixels();
-    for (std::size_t i = 0; i < g_dib.size(); ++i) {
+    const std::size_t total_px = static_cast<std::size_t>(g_win_w) * static_cast<std::size_t>(g_win_h);
+    if (g_dib.size() != total_px) g_dib.resize(total_px);
+    for (std::size_t i = 0; i < total_px; ++i) {
         std::uint32_t p = src[i];
         g_dib[i] = ((p & 0xFFU) << 16U) | (p & 0xFF00U) | ((p >> 16U) & 0xFFU);
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Win32 plumbing
+// Win32 Presentation
 // ─────────────────────────────────────────────────────────────────────────────
 void present(HDC dc) {
     render_frame();
     BITMAPINFO bi{};
     bi.bmiHeader.biSize        = sizeof(bi.bmiHeader);
-    bi.bmiHeader.biWidth       = kWinW;
-    bi.bmiHeader.biHeight      = -kWinH;
+    bi.bmiHeader.biWidth       = g_win_w;
+    bi.bmiHeader.biHeight      = -g_win_h;
     bi.bmiHeader.biPlanes      = 1;
     bi.bmiHeader.biBitCount    = 32;
     bi.bmiHeader.biCompression = BI_RGB;
     StretchDIBits(dc,
-                  0, 0, kWinW, kWinH,
-                  0, 0, kWinW, kWinH,
+                  0, 0, g_win_w, g_win_h,
+                  0, 0, g_win_w, g_win_h,
                   g_dib.data(), &bi, DIB_RGB_COLORS, SRCCOPY);
 }
 
@@ -628,6 +544,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             HDC dc = BeginPaint(hwnd, &ps);
             present(dc);
             EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_SIZE: {
+            int new_w = LOWORD(lp);
+            int new_h = HIWORD(lp);
+            if (new_w > 0 && new_h > 0) {
+                on_window_resize(new_w, new_h);
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             return 0;
         }
         case WM_ERASEBKGND: return 1;
@@ -697,7 +622,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 case VK_ESCAPE:g_ui.feed_key(glm::Key::Escape);    break;
                 case 'Z': if (GetKeyState(VK_CONTROL)&0x8000) do_undo(); break;
                 case 'Y': if (GetKeyState(VK_CONTROL)&0x8000) do_redo(); break;
-                // Brush size shortcuts
                 case VK_OEM_4: // [
                     g_size_f = std::max(1.0f, g_size_f - 1.0f);
                     g_size = static_cast<int>(g_size_f);
@@ -706,7 +630,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     g_size_f = std::min(40.0f, g_size_f + 1.0f);
                     g_size = static_cast<int>(g_size_f);
                     break;
-                // Quick tool selection
                 case 'P': g_tool = Tool::Pencil;      g_tool_idx = 0; break;
                 case 'B': g_tool = Tool::Brush;       g_tool_idx = 1; break;
                 case 'E': g_tool = Tool::Eraser;      g_tool_idx = 3; break;
@@ -731,13 +654,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 }  // namespace
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WinMain
+// Entry Point
 // ─────────────────────────────────────────────────────────────────────────────
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int nShow) {
+    on_window_resize(1200, 720);
     clear_canvas();
     blit(g_preview, g_canvas);
 
-    const wchar_t* kClass = L"GlimmerPaintV2";
+    const wchar_t* kClass = L"GlimmerPaintResizable";
     WNDCLASSW wc{};
     wc.lpfnWndProc   = WndProc;
     wc.hInstance     = inst;
@@ -746,10 +670,11 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int nShow) {
     wc.lpszClassName = kClass;
     if (!RegisterClassW(&wc)) { MessageBoxW(nullptr, L"Register failed", L"Paint", MB_ICONERROR); return 1; }
 
-    RECT bounds{0, 0, kWinW, kWinH};
-    AdjustWindowRect(&bounds, WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX, FALSE);
-    HWND hwnd = CreateWindowExW(0U, kClass, L"Glimmer Paint  — v2",
-        WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,
+    RECT bounds{0, 0, g_win_w, g_win_h};
+    // Include WS_THICKFRAME and WS_MAXIMIZEBOX to allow user resizing & maximizing
+    AdjustWindowRect(&bounds, WS_OVERLAPPEDWINDOW, FALSE);
+    HWND hwnd = CreateWindowExW(0U, kClass, L"Glimmer Paint — Resizable & Scalable",
+        WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         bounds.right-bounds.left, bounds.bottom-bounds.top,
         nullptr, nullptr, inst, nullptr);
