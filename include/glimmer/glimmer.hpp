@@ -1444,6 +1444,786 @@ public:
         }
     }
 
+
+    // [Surface 1] Inverts RGB channels of the entire surface
+    void filter_invert() {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            pixels_[i] = (p & 0xFF000000U) | ((~p) & 0x00FFFFFFU);
+        }
+    }
+    // [Surface 2] Converts entire surface to grayscale
+    void filter_grayscale() {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            std::uint32_t r = p & 0xFFU;
+            std::uint32_t g = (p >> 8U) & 0xFFU;
+            std::uint32_t b = (p >> 16U) & 0xFFU;
+            std::uint32_t gray = (r * 299U + g * 587U + b * 114U) / 1000U;
+            pixels_[i] = (p & 0xFF000000U) | (gray) | (gray << 8U) | (gray << 16U);
+        }
+    }
+    // [Surface 3] Applies sepia tone filter
+    void filter_sepia() {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            float r = static_cast<float>(p & 0xFFU);
+            float g = static_cast<float>((p >> 8U) & 0xFFU);
+            float b = static_cast<float>((p >> 16U) & 0xFFU);
+            std::uint32_t tr = std::min(255U, static_cast<std::uint32_t>(r * 0.393f + g * 0.769f + b * 0.189f));
+            std::uint32_t tg = std::min(255U, static_cast<std::uint32_t>(r * 0.349f + g * 0.686f + b * 0.168f));
+            std::uint32_t tb = std::min(255U, static_cast<std::uint32_t>(r * 0.272f + g * 0.534f + b * 0.131f));
+            pixels_[i] = (p & 0xFF000000U) | (tr) | (tg << 8U) | (tb << 16U);
+        }
+    }
+    // [Surface 4] Adjusts surface brightness (-255 to 255)
+    void filter_brightness(int delta) {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            int r = std::clamp(static_cast<int>(p & 0xFFU) + delta, 0, 255);
+            int g = std::clamp(static_cast<int>((p >> 8U) & 0xFFU) + delta, 0, 255);
+            int b = std::clamp(static_cast<int>((p >> 16U) & 0xFFU) + delta, 0, 255);
+            pixels_[i] = (p & 0xFF000000U) | (static_cast<std::uint32_t>(r)) | (static_cast<std::uint32_t>(g) << 8U) | (static_cast<std::uint32_t>(b) << 16U);
+        }
+    }
+    // [Surface 5] Adjusts surface contrast (factor > 0)
+    void filter_contrast(float factor) {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            auto adj = [factor](std::uint32_t ch) {
+                float v = (static_cast<float>(ch) - 128.0f) * factor + 128.0f;
+                return static_cast<std::uint32_t>(std::clamp(v, 0.0f, 255.0f));
+            };
+            pixels_[i] = (p & 0xFF000000U) | adj(p & 0xFFU) | (adj((p >> 8U) & 0xFFU) << 8U) | (adj((p >> 16U) & 0xFFU) << 16U);
+        }
+    }
+    // [Surface 6] Posterizes image into given number of levels
+    void filter_posterize(int levels) {
+        if (levels <= 1) return;
+        int step = 255 / (levels - 1);
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            auto pos = [step](std::uint32_t ch) { return std::min(255U, ((ch + step / 2U) / step) * step); };
+            pixels_[i] = (p & 0xFF000000U) | pos(p & 0xFFU) | (pos((p >> 8U) & 0xFFU) << 8U) | (pos((p >> 16U) & 0xFFU) << 16U);
+        }
+    }
+    // [Surface 7] Binarizes image based on brightness threshold
+    void filter_threshold(std::uint8_t threshold) {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            std::uint32_t gray = ((p & 0xFFU) * 299U + ((p >> 8U) & 0xFFU) * 587U + ((p >> 16U) & 0xFFU) * 114U) / 1000U;
+            std::uint32_t col = (gray >= threshold) ? 0x00FFFFFFU : 0x00000000U;
+            pixels_[i] = (p & 0xFF000000U) | col;
+        }
+    }
+    // [Surface 8] Tint all pixels towards target color by blend weight
+    void filter_tint(std::uint32_t tint_color, float weight) {
+        float w = std::clamp(weight, 0.0f, 1.0f);
+        float tr = static_cast<float>(tint_color & 0xFFU);
+        float tg = static_cast<float>((tint_color >> 8U) & 0xFFU);
+        float tb = static_cast<float>((tint_color >> 16U) & 0xFFU);
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            float r = static_cast<float>(p & 0xFFU) * (1.0f - w) + tr * w;
+            float g = static_cast<float>((p >> 8U) & 0xFFU) * (1.0f - w) + tg * w;
+            float b = static_cast<float>((p >> 16U) & 0xFFU) * (1.0f - w) + tb * w;
+            pixels_[i] = (p & 0xFF000000U) | static_cast<std::uint32_t>(r) | (static_cast<std::uint32_t>(g) << 8U) | (static_cast<std::uint32_t>(b) << 16U);
+        }
+    }
+    // [Surface 9] Gamma correction adjustment
+    void filter_gamma(float gamma) {
+        if (gamma <= 0.0f) return;
+        float inv = 1.0f / gamma;
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            auto gc = [inv](std::uint32_t ch) {
+                return static_cast<std::uint32_t>(std::clamp(std::pow(ch / 255.0f, inv) * 255.0f, 0.0f, 255.0f));
+            };
+            pixels_[i] = (p & 0xFF000000U) | gc(p & 0xFFU) | (gc((p >> 8U) & 0xFFU) << 8U) | (gc((p >> 16U) & 0xFFU) << 16U);
+        }
+    }
+    // [Surface 10] Swaps Red and Blue channels
+    void swap_red_blue() {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            pixels_[i] = (p & 0xFF00FF00U) | ((p & 0xFFU) << 16U) | ((p >> 16U) & 0xFFU);
+        }
+    }
+
+
+    // [Surface 11] Draws an equilateral filled hexagon centered at (cx, cy)
+    void draw_filled_hexagon(float cx, float cy, float radius, std::uint32_t color) {
+        if (radius <= 0.0f) return;
+        std::array<float, 12> pts;
+        for (int i = 0; i < 6; ++i) {
+            double a = i * (3.14159265358979323846 / 3.0);
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + radius * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + radius * std::sin(a));
+        }
+        draw_filled_polygon(pts.data(), 6U, color);
+    }
+    // [Surface 12] Draws an equilateral hexagon outline centered at (cx, cy)
+    void draw_hexagon_outline(float cx, float cy, float radius, std::uint32_t color, float thickness = 1.0f) {
+        if (radius <= 0.0f) return;
+        std::array<float, 12> pts;
+        for (int i = 0; i < 6; ++i) {
+            double a = i * (3.14159265358979323846 / 3.0);
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + radius * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + radius * std::sin(a));
+        }
+        draw_polygon_outline(pts.data(), 6U, color, thickness);
+    }
+    // [Surface 13] Draws a regular filled octagon
+    void draw_filled_octagon(float cx, float cy, float radius, std::uint32_t color) {
+        if (radius <= 0.0f) return;
+        std::array<float, 16> pts;
+        for (int i = 0; i < 8; ++i) {
+            double a = i * (3.14159265358979323846 / 4.0);
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + radius * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + radius * std::sin(a));
+        }
+        draw_filled_polygon(pts.data(), 8U, color);
+    }
+    // [Surface 14] Draws an octagon outline
+    void draw_octagon_outline(float cx, float cy, float radius, std::uint32_t color, float thickness = 1.0f) {
+        if (radius <= 0.0f) return;
+        std::array<float, 16> pts;
+        for (int i = 0; i < 8; ++i) {
+            double a = i * (3.14159265358979323846 / 4.0);
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + radius * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + radius * std::sin(a));
+        }
+        draw_polygon_outline(pts.data(), 8U, color, thickness);
+    }
+    // [Surface 15] Draws a regular filled pentagon
+    void draw_filled_pentagon(float cx, float cy, float radius, std::uint32_t color) {
+        if (radius <= 0.0f) return;
+        std::array<float, 10> pts;
+        for (int i = 0; i < 5; ++i) {
+            double a = -1.57079632679 + i * (6.28318530718 / 5.0);
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + radius * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + radius * std::sin(a));
+        }
+        draw_filled_polygon(pts.data(), 5U, color);
+    }
+    // [Surface 16] Draws a pentagon outline
+    void draw_pentagon_outline(float cx, float cy, float radius, std::uint32_t color, float thickness = 1.0f) {
+        if (radius <= 0.0f) return;
+        std::array<float, 10> pts;
+        for (int i = 0; i < 5; ++i) {
+            double a = -1.57079632679 + i * (6.28318530718 / 5.0);
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + radius * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + radius * std::sin(a));
+        }
+        draw_polygon_outline(pts.data(), 5U, color, thickness);
+    }
+    // [Surface 17] Draws a filled 4-point star
+    void draw_filled_star4(float cx, float cy, float outer_r, float inner_r, std::uint32_t color) {
+        if (outer_r <= 0.0f || inner_r <= 0.0f) return;
+        std::array<float, 16> pts;
+        for (int i = 0; i < 8; ++i) {
+            double a = i * (3.14159265358979323846 / 4.0);
+            double r = (i % 2 == 0) ? outer_r : inner_r;
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + r * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + r * std::sin(a));
+        }
+        draw_filled_polygon(pts.data(), 8U, color);
+    }
+    // [Surface 18] Draws a 4-point star outline
+    void draw_star4_outline(float cx, float cy, float outer_r, float inner_r, std::uint32_t color, float thickness = 1.0f) {
+        if (outer_r <= 0.0f || inner_r <= 0.0f) return;
+        std::array<float, 16> pts;
+        for (int i = 0; i < 8; ++i) {
+            double a = i * (3.14159265358979323846 / 4.0);
+            double r = (i % 2 == 0) ? outer_r : inner_r;
+            pts[static_cast<std::size_t>(i * 2)] = static_cast<float>(cx + r * std::cos(a));
+            pts[static_cast<std::size_t>(i * 2 + 1)] = static_cast<float>(cy + r * std::sin(a));
+        }
+        draw_polygon_outline(pts.data(), 8U, color, thickness);
+    }
+    // [Surface 19] Draws a filled heart shape inside bounding rect
+    void draw_filled_heart(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h;
+        float r = w * 0.25f;
+        draw_filled_circle(static_cast<int>(x + r), static_cast<int>(y + r), static_cast<int>(r), color);
+        draw_filled_circle(static_cast<int>(x + 3.0f * r), static_cast<int>(y + r), static_cast<int>(r), color);
+        draw_filled_triangle(x, y + r, x + w, y + r, x + w * 0.5f, y + h, color);
+    }
+    // [Surface 20] Draws a right triangle fill
+    void draw_filled_right_triangle(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        draw_filled_triangle(rect.x, rect.y, rect.x, rect.y + rect.h, rect.x + rect.w, rect.y + rect.h, color);
+    }
+
+
+    // [Surface 21] Draws a right triangle outline
+    void draw_right_triangle_outline(Rect rect, std::uint32_t color, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        draw_triangle_outline(rect.x, rect.y, rect.x, rect.y + rect.h, rect.x + rect.w, rect.y + rect.h, color, thickness);
+    }
+    // [Surface 22] Draws a filled parallelogram with skew offset
+    void draw_filled_parallelogram(Rect rect, float skew, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        std::array<float, 8> pts{{
+            rect.x + skew, rect.y,
+            rect.x + rect.w, rect.y,
+            rect.x + rect.w - skew, rect.y + rect.h,
+            rect.x, rect.y + rect.h
+        }};
+        draw_filled_polygon(pts.data(), 4U, color);
+    }
+    // [Surface 23] Draws a parallelogram outline
+    void draw_parallelogram_outline(Rect rect, float skew, std::uint32_t color, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        std::array<float, 8> pts{{
+            rect.x + skew, rect.y,
+            rect.x + rect.w, rect.y,
+            rect.x + rect.w - skew, rect.y + rect.h,
+            rect.x, rect.y + rect.h
+        }};
+        draw_polygon_outline(pts.data(), 4U, color, thickness);
+    }
+    // [Surface 24] Draws an isosceles trapezoid fill
+    void draw_filled_trapezoid(Rect rect, float inset, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        std::array<float, 8> pts{{
+            rect.x + inset, rect.y,
+            rect.x + rect.w - inset, rect.y,
+            rect.x + rect.w, rect.y + rect.h,
+            rect.x, rect.y + rect.h
+        }};
+        draw_filled_polygon(pts.data(), 4U, color);
+    }
+    // [Surface 25] Draws a trapezoid outline
+    void draw_trapezoid_outline(Rect rect, float inset, std::uint32_t color, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        std::array<float, 8> pts{{
+            rect.x + inset, rect.y,
+            rect.x + rect.w - inset, rect.y,
+            rect.x + rect.w, rect.y + rect.h,
+            rect.x, rect.y + rect.h
+        }};
+        draw_polygon_outline(pts.data(), 4U, color, thickness);
+    }
+    // [Surface 26] Draws an arc outline between start and end angles in radians
+    void draw_arc(float cx, float cy, float radius, float start_angle, float end_angle, std::uint32_t color, int segments = 24) {
+        if (radius <= 0.0f || segments <= 0) return;
+        float prev_x = cx + radius * std::cos(start_angle);
+        float prev_y = cy + radius * std::sin(start_angle);
+        for (int i = 1; i <= segments; ++i) {
+            float t = static_cast<float>(i) / static_cast<float>(segments);
+            float a = start_angle + (end_angle - start_angle) * t;
+            float cur_x = cx + radius * std::cos(a);
+            float cur_y = cy + radius * std::sin(a);
+            draw_line(static_cast<int>(prev_x), static_cast<int>(prev_y), static_cast<int>(cur_x), static_cast<int>(cur_y), color);
+            prev_x = cur_x;
+            prev_y = cur_y;
+        }
+    }
+    // [Surface 27] Draws a pie sector fill
+    void draw_pie_sector(float cx, float cy, float radius, float start_angle, float end_angle, std::uint32_t color, int segments = 24) {
+        if (radius <= 0.0f || segments <= 0) return;
+        std::vector<float> pts;
+        pts.reserve(static_cast<std::size_t>((segments + 2) * 2));
+        pts.push_back(cx);
+        pts.push_back(cy);
+        for (int i = 0; i <= segments; ++i) {
+            float t = static_cast<float>(i) / static_cast<float>(segments);
+            float a = start_angle + (end_angle - start_angle) * t;
+            pts.push_back(cx + radius * std::cos(a));
+            pts.push_back(cy + radius * std::sin(a));
+        }
+        draw_filled_polygon(pts.data(), static_cast<std::size_t>(segments + 2), color);
+    }
+    // [Surface 28] Draws an annular sector / donut slice fill
+    void draw_annular_sector(float cx, float cy, float inner_r, float outer_r, float start_a, float end_a, std::uint32_t color, int segments = 24) {
+        if (inner_r <= 0.0f || outer_r <= inner_r || segments <= 0) return;
+        std::vector<float> pts;
+        for (int i = 0; i <= segments; ++i) {
+            float t = static_cast<float>(i) / static_cast<float>(segments);
+            float a = start_a + (end_a - start_a) * t;
+            pts.push_back(cx + outer_r * std::cos(a));
+            pts.push_back(cy + outer_r * std::sin(a));
+        }
+        for (int i = segments; i >= 0; --i) {
+            float t = static_cast<float>(i) / static_cast<float>(segments);
+            float a = start_a + (end_a - start_a) * t;
+            pts.push_back(cx + inner_r * std::cos(a));
+            pts.push_back(cy + inner_r * std::sin(a));
+        }
+        draw_filled_polygon(pts.data(), pts.size() / 2U, color);
+    }
+    // [Surface 29] Draws a thick line using a rotated quad
+    void draw_thick_line(float x0, float y0, float x1, float y1, float thickness, std::uint32_t color) {
+        float dx = x1 - x0, dy = y1 - y0;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len <= 0.0f || thickness <= 0.0f) return;
+        float nx = (-dy / len) * (thickness * 0.5f);
+        float ny = (dx / len) * (thickness * 0.5f);
+        std::array<float, 8> pts{{
+            x0 + nx, y0 + ny,
+            x1 + nx, y1 + ny,
+            x1 - nx, y1 - ny,
+            x0 - nx, y0 - ny
+        }};
+        draw_filled_polygon(pts.data(), 4U, color);
+    }
+    // [Surface 30] Draws a pill / capsule filled shape
+    void draw_filled_pill(Rect rect, std::uint32_t color) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float r = std::min(rect.w, rect.h) * 0.5f;
+        draw_rounded_rect(rect, r, color);
+    }
+
+
+    // [Surface 31] Draws a pill / capsule outline
+    void draw_pill_outline(Rect rect, std::uint32_t color, float thickness = 1.0f) {
+        if (rect.w <= 0.0f || rect.h <= 0.0f) return;
+        float r = std::min(rect.w, rect.h) * 0.5f;
+        draw_rounded_rect_outline(rect, r, color, thickness);
+    }
+    // [Surface 32] Flips surface horizontally in-place
+    void flip_horizontal() {
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_ / 2; ++x) {
+                std::swap(pixels_[y * width_ + x], pixels_[y * width_ + (width_ - 1 - x)]);
+            }
+        }
+    }
+    // [Surface 33] Flips surface vertically in-place
+    void flip_vertical() {
+        for (int y = 0; y < height_ / 2; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                std::swap(pixels_[y * width_ + x], pixels_[(height_ - 1 - y) * width_ + x]);
+            }
+        }
+    }
+    // [Surface 34] Rotates surface 90 degrees clockwise
+    void rotate_90_cw() {
+        std::vector<std::uint32_t> next_px(pixels_.size());
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                next_px[x * height_ + (height_ - 1 - y)] = pixels_[y * width_ + x];
+            }
+        }
+        std::swap(width_, height_);
+        pixels_ = std::move(next_px);
+        clips_.clear();
+        clips_.push_back({0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_)});
+    }
+    // [Surface 35] Rotates surface 180 degrees
+    void rotate_180() {
+        flip_horizontal();
+        flip_vertical();
+    }
+    // [Surface 36] Rotates surface 270 degrees clockwise (90 counter-clockwise)
+    void rotate_270_cw() {
+        rotate_90_cw();
+        rotate_90_cw();
+        rotate_90_cw();
+    }
+    // [Surface 37] Copies sub-rectangle to a newly allocated Surface
+    Surface crop(Rect rect) const {
+        int x0 = std::max(0, static_cast<int>(rect.x));
+        int y0 = std::max(0, static_cast<int>(rect.y));
+        int w = std::min(width_ - x0, static_cast<int>(rect.w));
+        int h = std::min(height_ - y0, static_cast<int>(rect.h));
+        Surface out(std::max(0, w), std::max(0, h));
+        for (int y = 0; y < h; ++y) {
+            for (int x = 0; x < w; ++x) {
+                out.pixels()[y * w + x] = pixels_[(y0 + y) * width_ + (x0 + x)];
+            }
+        }
+        return out;
+    }
+    // [Surface 38] Pastes source surface with blend at integer coordinates (dst_x, dst_y)
+    void paste(const Surface& src, int dst_x, int dst_y) {
+        for (int sy = 0; sy < src.height(); ++sy) {
+            int dy = dst_y + sy;
+            if (dy < 0 || dy >= height_) continue;
+            for (int sx = 0; sx < src.width(); ++sx) {
+                int dx = dst_x + sx;
+                if (dx < 0 || dx >= width_) continue;
+                blend_pixel(dx, dy, src.pixels()[sy * src.width() + sx]);
+            }
+        }
+    }
+    // [Surface 39] Pastes source surface unconditionally (opaque copy)
+    void paste_opaque(const Surface& src, int dst_x, int dst_y) {
+        for (int sy = 0; sy < src.height(); ++sy) {
+            int dy = dst_y + sy;
+            if (dy < 0 || dy >= height_) continue;
+            for (int sx = 0; sx < src.width(); ++sx) {
+                int dx = dst_x + sx;
+                if (dx < 0 || dx >= width_) continue;
+                pixels_[dy * width_ + dx] = src.pixels()[sy * src.width() + sx];
+            }
+        }
+    }
+    // [Surface 40] Replaces all pixels of a given color with a replacement color
+    void replace_color(std::uint32_t target_color, std::uint32_t replacement_color) {
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            if (pixels_[i] == target_color) pixels_[i] = replacement_color;
+        }
+    }
+
+
+    // [Surface 41] Returns pixel at coordinate, or 0 if out of bounds
+    std::uint32_t get_pixel(int x, int y) const {
+        if (x < 0 || y < 0 || x >= width_ || y >= height_) return 0U;
+        return pixels_[static_cast<std::size_t>(y * width_ + x)];
+    }
+    // [Surface 42] Sets pixel at coordinate with bounds checking
+    void set_pixel(int x, int y, std::uint32_t color) {
+        if (x >= 0 && y >= 0 && x < width_ && y < height_ && inside_clip(x, y)) {
+            blend_pixel(x, y, color);
+        }
+    }
+    // [Surface 43] Sets pixel directly bypassing alpha blending
+    void set_pixel_opaque(int x, int y, std::uint32_t color) {
+        if (x >= 0 && y >= 0 && x < width_ && y < height_ && inside_clip(x, y)) {
+            pixels_[y * width_ + x] = color;
+        }
+    }
+    // [Surface 44] Fills surface with radial gradient centered at (cx, cy)
+    void draw_radial_gradient(float cx, float cy, float radius, std::uint32_t inner_col, std::uint32_t outer_col) {
+        if (radius <= 0.0f) return;
+        int min_x = std::max(0, static_cast<int>(cx - radius));
+        int max_x = std::min(width_ - 1, static_cast<int>(cx + radius));
+        int min_y = std::max(0, static_cast<int>(cy - radius));
+        int max_y = std::min(height_ - 1, static_cast<int>(cy + radius));
+        for (int y = min_y; y <= max_y; ++y) {
+            for (int x = min_x; x <= max_x; ++x) {
+                float dist = std::sqrt((x - cx)*(x - cx) + (y - cy)*(y - cy));
+                if (dist > radius) continue;
+                float t = dist / radius;
+                std::uint32_t col = 0;
+                for (int s = 0; s < 32; s += 8) {
+                    float ch0 = static_cast<float>((inner_col >> s) & 0xFFU);
+                    float ch1 = static_cast<float>((outer_col >> s) & 0xFFU);
+                    col |= static_cast<std::uint32_t>(ch0 * (1.0f - t) + ch1 * t) << s;
+                }
+                blend_pixel(x, y, col);
+            }
+        }
+    }
+    // [Surface 45] Draws a dotted grid pattern
+    void draw_dot_grid(Rect rect, int spacing, std::uint32_t dot_color) {
+        if (spacing <= 0) return;
+        for (int y = static_cast<int>(rect.y); y < static_cast<int>(rect.y + rect.h); y += spacing) {
+            for (int x = static_cast<int>(rect.x); x < static_cast<int>(rect.x + rect.w); x += spacing) {
+                if (inside_clip(x, y)) blend_pixel(x, y, dot_color);
+            }
+        }
+    }
+    // [Surface 46] Draws a linear cross-hatch pattern
+    void draw_cross_hatch(Rect rect, int spacing, std::uint32_t line_color) {
+        if (spacing <= 0) return;
+        for (int y = static_cast<int>(rect.y); y < static_cast<int>(rect.y + rect.h); y += spacing) {
+            draw_line(static_cast<int>(rect.x), y, static_cast<int>(rect.x + rect.w), y, line_color);
+        }
+        for (int x = static_cast<int>(rect.x); x < static_cast<int>(rect.x + rect.w); x += spacing) {
+            draw_line(x, static_cast<int>(rect.y), x, static_cast<int>(rect.y + rect.h), line_color);
+        }
+    }
+    // [Surface 47] Draws diagonal stripes
+    void draw_diagonal_stripes(Rect rect, int spacing, std::uint32_t stripe_color) {
+        if (spacing <= 0) return;
+        int total = static_cast<int>(rect.w + rect.h);
+        for (int d = 0; d < total; d += spacing) {
+            draw_line(static_cast<int>(rect.x + d), static_cast<int>(rect.y),
+                      static_cast<int>(rect.x), static_cast<int>(rect.y + d), stripe_color);
+        }
+    }
+    // [Surface 48] Calculates average RGB color of a given rectangle
+    std::uint32_t average_color(Rect rect) const {
+        int x0 = std::max(0, static_cast<int>(rect.x));
+        int y0 = std::max(0, static_cast<int>(rect.y));
+        int x1 = std::min(width_, static_cast<int>(rect.x + rect.w));
+        int y1 = std::min(height_, static_cast<int>(rect.y + rect.h));
+        std::uint64_t r = 0, g = 0, b = 0, count = 0;
+        for (int y = y0; y < y1; ++y) {
+            for (int x = x0; x < x1; ++x) {
+                std::uint32_t p = pixels_[y * width_ + x];
+                r += (p & 0xFFU);
+                g += ((p >> 8U) & 0xFFU);
+                b += ((p >> 16U) & 0xFFU);
+                ++count;
+            }
+        }
+        if (count == 0) return 0xFF000000U;
+        return 0xFF000000U | (r / count) | ((g / count) << 8U) | ((b / count) << 16U);
+    }
+    // [Surface 49] Counts number of non-zero alpha pixels
+    std::size_t count_opaque_pixels() const {
+        std::size_t c = 0;
+        for (std::uint32_t p : pixels_) {
+            if ((p >> 24U) > 0) ++c;
+        }
+        return c;
+    }
+    // [Surface 50] Multiplies surface alpha channel by scalar (0..1)
+    void multiply_alpha(float factor) {
+        float f = std::clamp(factor, 0.0f, 1.0f);
+        for (std::size_t i = 0; i < pixels_.size(); ++i) {
+            std::uint32_t p = pixels_[i];
+            std::uint32_t a = static_cast<std::uint32_t>((p >> 24U) * f);
+            pixels_[i] = (p & 0x00FFFFFFU) | (a << 24U);
+        }
+    }
+
+
+    // [Surface 51]
+    void draw_cross_hair(int cx, int cy, int size, std::uint32_t color) {
+        draw_line(cx - size, cy, cx + size, cy, color); draw_line(cx, cy - size, cx, cy + size, color);
+    }
+
+    // [Surface 52]
+    void draw_plus_icon(Rect rect, std::uint32_t color) {
+        float mx = rect.x + rect.w * 0.5f; float my = rect.y + rect.h * 0.5f; draw_line(static_cast<int>(rect.x), static_cast<int>(my), static_cast<int>(rect.x + rect.w), static_cast<int>(my), color); draw_line(static_cast<int>(mx), static_cast<int>(rect.y), static_cast<int>(mx), static_cast<int>(rect.y + rect.h), color);
+    }
+
+    // [Surface 53]
+    void draw_minus_icon(Rect rect, std::uint32_t color) {
+        float my = rect.y + rect.h * 0.5f; draw_line(static_cast<int>(rect.x), static_cast<int>(my), static_cast<int>(rect.x + rect.w), static_cast<int>(my), color);
+    }
+
+    // [Surface 54]
+    void draw_check_icon(Rect rect, std::uint32_t color) {
+        float x = rect.x, y = rect.y, w = rect.w, h = rect.h; draw_line(static_cast<int>(x + w*0.2f), static_cast<int>(y + h*0.5f), static_cast<int>(x + w*0.4f), static_cast<int>(y + h*0.8f), color); draw_line(static_cast<int>(x + w*0.4f), static_cast<int>(y + h*0.8f), static_cast<int>(x + w*0.8f), static_cast<int>(y + h*0.2f), color);
+    }
+
+    // [Surface 55]
+    void draw_close_icon(Rect rect, std::uint32_t color) {
+        draw_line(static_cast<int>(rect.x), static_cast<int>(rect.y), static_cast<int>(rect.x + rect.w), static_cast<int>(rect.y + rect.h), color); draw_line(static_cast<int>(rect.x + rect.w), static_cast<int>(rect.y), static_cast<int>(rect.x), static_cast<int>(rect.y + rect.h), color);
+    }
+
+    // [Surface 56]
+    void draw_gear_icon(float cx, float cy, float r, std::uint32_t color) {
+        draw_circle_outline(static_cast<int>(cx), static_cast<int>(cy), static_cast<int>(r), color, 2); draw_circle_outline(static_cast<int>(cx), static_cast<int>(cy), static_cast<int>(r*0.4f), color, 1);
+    }
+
+    // [Surface 57]
+    void draw_folder_icon(Rect rect, std::uint32_t color) {
+        draw_rounded_rect_outline(rect, 3.0f, color, 1.0f); draw_line(static_cast<int>(rect.x), static_cast<int>(rect.y + 6.0f), static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + 6.0f), color);
+    }
+
+    // [Surface 58]
+    void draw_document_icon(Rect rect, std::uint32_t color) {
+        draw_rounded_rect_outline(rect, 2.0f, color, 1.0f); draw_line(static_cast<int>(rect.x + 3), static_cast<int>(rect.y + 6), static_cast<int>(rect.x + rect.w - 3), static_cast<int>(rect.y + 6), color); draw_line(static_cast<int>(rect.x + 3), static_cast<int>(rect.y + 11), static_cast<int>(rect.x + rect.w - 3), static_cast<int>(rect.y + 11), color);
+    }
+
+    // [Surface 59]
+    void draw_diskette_icon(Rect rect, std::uint32_t color) {
+        draw_rounded_rect_outline(rect, 2.0f, color, 1.0f); fill_rect({rect.x + 4.0f, rect.y, rect.w - 8.0f, 6.0f}, color);
+    }
+
+    // [Surface 60]
+    void draw_clipboard_icon(Rect rect, std::uint32_t color) {
+        draw_rounded_rect_outline(rect, 2.0f, color, 1.0f); fill_rect({rect.x + rect.w*0.3f, rect.y - 2.0f, rect.w*0.4f, 4.0f}, color);
+    }
+
+    // [Surface 61]
+    void draw_trash_icon(Rect rect, std::uint32_t color) {
+        draw_line(static_cast<int>(rect.x), static_cast<int>(rect.y + 4), static_cast<int>(rect.x + rect.w), static_cast<int>(rect.y + 4), color); draw_rounded_rect_outline({rect.x + 2.0f, rect.y + 4.0f, rect.w - 4.0f, rect.h - 4.0f}, 2.0f, color, 1.0f);
+    }
+
+    // [Surface 62]
+    void draw_lock_icon(Rect rect, std::uint32_t color) {
+        fill_rect({rect.x, rect.y + rect.h*0.4f, rect.w, rect.h*0.6f}, color); draw_circle_outline(static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + rect.h*0.4f), static_cast<int>(rect.w*0.3f), color, 1);
+    }
+
+    // [Surface 63]
+    void draw_unlock_icon(Rect rect, std::uint32_t color) {
+        fill_rect({rect.x, rect.y + rect.h*0.4f, rect.w, rect.h*0.6f}, color); draw_circle_outline(static_cast<int>(rect.x + rect.w*0.6f), static_cast<int>(rect.y + rect.h*0.3f), static_cast<int>(rect.w*0.3f), color, 1);
+    }
+
+    // [Surface 64]
+    void draw_bell_icon(Rect rect, std::uint32_t color) {
+        draw_circle_outline(static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + rect.h*0.4f), static_cast<int>(rect.w*0.35f), color, 1); draw_line(static_cast<int>(rect.x), static_cast<int>(rect.y + rect.h*0.8f), static_cast<int>(rect.x + rect.w), static_cast<int>(rect.y + rect.h*0.8f), color);
+    }
+
+    // [Surface 65]
+    void draw_pin_icon(Rect rect, std::uint32_t color) {
+        draw_filled_circle(static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + 4), 3, color); draw_line(static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + 4), static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + rect.h), color);
+    }
+
+    // [Surface 66]
+    void draw_wifi_icon(Rect rect, std::uint32_t color) {
+        draw_arc(rect.x + rect.w*0.5f, rect.y + rect.h*0.8f, rect.w*0.4f, -2.5f, -0.6f, color, 8); draw_filled_circle(static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + rect.h*0.8f), 2, color);
+    }
+
+    // [Surface 67]
+    void draw_battery_icon(Rect rect, std::uint32_t color) {
+        draw_rounded_rect_outline(rect, 2.0f, color, 1.0f); fill_rect({rect.x + rect.w, rect.y + rect.h*0.3f, 2.0f, rect.h*0.4f}, color);
+    }
+
+    // [Surface 68]
+    void draw_sun_icon(float cx, float cy, float r, std::uint32_t color) {
+        draw_filled_circle(static_cast<int>(cx), static_cast<int>(cy), static_cast<int>(r*0.5f), color); for (int i=0; i<8; ++i) { float a=i*0.785f; draw_line(static_cast<int>(cx+r*0.6f*std::cos(a)), static_cast<int>(cy+r*0.6f*std::sin(a)), static_cast<int>(cx+r*std::cos(a)), static_cast<int>(cy+r*std::sin(a)), color); }
+    }
+
+    // [Surface 69]
+    void draw_moon_icon(Rect rect, std::uint32_t color) {
+        draw_filled_circle(static_cast<int>(rect.x + rect.w*0.5f), static_cast<int>(rect.y + rect.h*0.5f), static_cast<int>(rect.w*0.4f), color);
+    }
+
+    // [Surface 70]
+    void draw_cloud_icon(Rect rect, std::uint32_t color) {
+        float cx = rect.x + rect.w*0.5f, cy = rect.y + rect.h*0.6f; draw_filled_circle(static_cast<int>(cx), static_cast<int>(cy), static_cast<int>(rect.w*0.25f), color); draw_filled_circle(static_cast<int>(cx - rect.w*0.2f), static_cast<int>(cy + 2), static_cast<int>(rect.w*0.18f), color); draw_filled_circle(static_cast<int>(cx + rect.w*0.2f), static_cast<int>(cy + 2), static_cast<int>(rect.w*0.18f), color);
+    }
+
+    // [Surface 71]
+    void draw_ruler_tick_h(int x, int y, int h, std::uint32_t color) {
+        draw_line(x, y, x, y + h, color);
+    }
+
+    // [Surface 72]
+    void draw_ruler_tick_v(int x, int y, int w, std::uint32_t color) {
+        draw_line(x, y, x + w, y, color);
+    }
+
+    // [Surface 73]
+    void draw_corner_bracket(Rect rect, float len, std::uint32_t color) {
+        draw_line(static_cast<int>(rect.x), static_cast<int>(rect.y), static_cast<int>(rect.x + len), static_cast<int>(rect.y), color); draw_line(static_cast<int>(rect.x), static_cast<int>(rect.y), static_cast<int>(rect.x), static_cast<int>(rect.y + len), color);
+    }
+
+    // [Surface 74]
+    void draw_centered_text(int cy, const std::string& text, std::uint32_t color, int scale = 1) {
+        Rect sz = measure_text(text, scale); int tx = std::max(0, static_cast<int>((width_ - sz.w)*0.5f)); draw_text(tx, cy, text, color, scale);
+    }
+
+    // [Surface 75]
+    void draw_right_text(int rx, int y, const std::string& text, std::uint32_t color, int scale = 1) {
+        Rect sz = measure_text(text, scale); draw_text(rx - static_cast<int>(sz.w), y, text, color, scale);
+    }
+
+    // [Surface 76]
+    void fill_surface(std::uint32_t color) {
+        clear(color);
+    }
+
+    // [Surface 77]
+    void blend_rect(Rect rect, std::uint32_t color) {
+        fill_rect(rect, color);
+    }
+
+    // [Surface 78]
+    void dim_rect(Rect rect, float alpha_fraction) {
+        std::uint32_t a = static_cast<std::uint32_t>(std::clamp(alpha_fraction, 0.0f, 1.0f)*255.0f); fill_rect(rect, (a << 24U));
+    }
+
+    // [Surface 79]
+    void highlight_rect(Rect rect, std::uint32_t glow_color) {
+        outline_rect(rect, glow_color, 2.0f);
+    }
+
+    // [Surface 80]
+    void draw_focus_ring(Rect rect, float offset, std::uint32_t color) {
+        outline_rect({rect.x - offset, rect.y - offset, rect.w + offset*2.0f, rect.h + offset*2.0f}, color, 1.0f);
+    }
+
+    // [Surface 81]
+    void copy_pixels_to(std::uint32_t* dst, std::size_t max_count) const {
+        std::memcpy(dst, pixels_.data(), std::min(max_count, pixels_.size()) * sizeof(std::uint32_t));
+    }
+
+    // [Surface 82]
+    void copy_pixels_from(const std::uint32_t* src, std::size_t count) {
+        std::memcpy(pixels_.data(), src, std::min(count, pixels_.size()) * sizeof(std::uint32_t));
+    }
+
+    // [Surface 83]
+    void fill_row(int y, std::uint32_t color) {
+        if (y >= 0 && y < height_) { for (int x = 0; x < width_; ++x) blend_pixel(x, y, color); }
+    }
+
+    // [Surface 84]
+    void fill_col(int x, std::uint32_t color) {
+        if (x >= 0 && x < width_) { for (int y = 0; y < height_; ++y) blend_pixel(x, y, color); }
+    }
+
+    // [Surface 85]
+    void swap_pixels(int x0, int y0, int x1, int y1) {
+        if (x0>=0 && y0>=0 && x0<width_ && y0<height_ && x1>=0 && y1>=0 && x1<width_ && y1<height_) std::swap(pixels_[y0*width_+x0], pixels_[y1*width_+x1]);
+    }
+
+    // [Surface 86]
+    void clear_rect(Rect rect) {
+        fill_rect_opaque(rect, 0U);
+    }
+
+    // [Surface 87]
+    void fill_checker(int cell_sz, std::uint32_t c1, std::uint32_t c2) {
+        draw_checkerboard({0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_)}, c1, c2, cell_sz);
+    }
+
+    // [Surface 88]
+    void draw_window_frame(Rect rect, std::uint32_t bg, std::uint32_t border, float radius = 4.0f) {
+        draw_rounded_rect(rect, radius, bg); draw_rounded_rect_outline(rect, radius, border, 1.0f);
+    }
+
+    // [Surface 89]
+    void draw_drop_shadow(Rect rect, int shadow_size, std::uint32_t shadow_col) {
+        for (int i=1; i<=shadow_size; ++i) { outline_rect({rect.x+i, rect.y+i, rect.w, rect.h}, shadow_col, 1.0f); }
+    }
+
+    // [Surface 90]
+    void draw_inner_shadow(Rect rect, int inset, std::uint32_t shadow_col) {
+        for (int i=0; i<inset; ++i) { outline_rect({rect.x+i, rect.y+i, rect.w-i*2.0f, rect.h-i*2.0f}, shadow_col, 1.0f); }
+    }
+
+    // [Surface 91]
+    void apply_vignette(float intensity) {
+        float cx = width_*0.5f, cy = height_*0.5f; float max_d = std::sqrt(cx*cx + cy*cy); for (int y=0; y<height_; ++y) { for (int x=0; x<width_; ++x) { float d = std::sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy)); float f = 1.0f - (d/max_d)*std::clamp(intensity, 0.0f, 1.0f); std::uint32_t p = pixels_[y*width_+x]; std::uint32_t r = static_cast<std::uint32_t>((p&0xFFU)*f); std::uint32_t g = static_cast<std::uint32_t>(((p>>8U)&0xFFU)*f); std::uint32_t b = static_cast<std::uint32_t>(((p>>16U)&0xFFU)*f); pixels_[y*width_+x] = (p&0xFF000000U)|r|(g<<8U)|(b<<16U); } }
+    }
+
+    // [Surface 92]
+    void blend_mode_add(int x, int y, std::uint32_t col) {
+        if (x>=0 && y>=0 && x<width_ && y<height_) { std::uint32_t p = pixels_[y*width_+x]; std::uint32_t r = std::min(255U, (p&0xFFU) + (col&0xFFU)); std::uint32_t g = std::min(255U, ((p>>8U)&0xFFU) + ((col>>8U)&0xFFU)); std::uint32_t b = std::min(255U, ((p>>16U)&0xFFU) + ((col>>16U)&0xFFU)); pixels_[y*width_+x] = (p&0xFF000000U)|r|(g<<8U)|(b<<16U); }
+    }
+
+    // [Surface 93]
+    void blend_mode_multiply(int x, int y, std::uint32_t col) {
+        if (x>=0 && y>=0 && x<width_ && y<height_) { std::uint32_t p = pixels_[y*width_+x]; std::uint32_t r = ((p&0xFFU) * (col&0xFFU))/255U; std::uint32_t g = (((p>>8U)&0xFFU) * ((col>>8U)&0xFFU))/255U; std::uint32_t b = (((p>>16U)&0xFFU) * ((col>>16U)&0xFFU))/255U; pixels_[y*width_+x] = (p&0xFF000000U)|r|(g<<8U)|(b<<16U); }
+    }
+
+    // [Surface 94]
+    void blend_mode_screen(int x, int y, std::uint32_t col) {
+        if (x>=0 && y>=0 && x<width_ && y<height_) { std::uint32_t p = pixels_[y*width_+x]; auto sc = [](std::uint32_t a, std::uint32_t b) { return 255U - ((255U-a)*(255U-b))/255U; }; pixels_[y*width_+x] = (p&0xFF000000U)|sc(p&0xFFU, col&0xFFU)|(sc((p>>8U)&0xFFU, (col>>8U)&0xFFU)<<8U)|(sc((p>>16U)&0xFFU, (col>>16U)&0xFFU)<<16U); }
+    }
+
+    // [Surface 95]
+    void draw_pixel_row_n(int x, int y, int n, std::uint32_t col) {
+        for (int i=0; i<n; ++i) if (x+i>=0 && x+i<width_ && y>=0 && y<height_) blend_pixel(x+i, y, col);
+    }
+
+    // [Surface 96]
+    void draw_pixel_col_n(int x, int y, int n, std::uint32_t col) {
+        for (int i=0; i<n; ++i) if (x>=0 && x<width_ && y+i>=0 && y+i<height_) blend_pixel(x, y+i, col);
+    }
+
+    // [Surface 97]
+    bool bounds_check(int x, int y) const {
+        return x>=0 && y>=0 && x<width_ && y<height_;
+    }
+
+    // [Surface 98]
+    std::size_t pixel_count() const {
+        return static_cast<std::size_t>(width_)*static_cast<std::size_t>(height_);
+    }
+
+    // [Surface 99]
+    std::size_t byte_size() const {
+        return pixel_count() * sizeof(std::uint32_t);
+    }
+
+    // [Surface 100]
+    bool is_empty() const {
+        return width_ <= 0 || height_ <= 0;
+    }
+
 private:
     void draw_path_outline(const float* vertices, std::size_t vertex_count,
                            std::uint32_t color, float thickness, bool closed) {
@@ -4814,6 +5594,553 @@ public:
         draw_icon(surface_, Rect{rect.x + 4.0f, rect.y + 4.0f, rect.w - 8.0f, rect.h - 8.0f}, selected ? 0xFFFFFFFFU : theme_.text);
         draw_focus(id, rect);
         return res;
+    }
+
+
+    // [Context 1] Draws a search input box with magnifying glass
+    Interaction search_bar(const std::string& id_text, std::string& search_str, const std::string& placeholder = "Search...") {
+        clear_last_widget();
+        const Rect rect = allocate(28.0f);
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, theme_.window);
+        surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.border, 1.0f);
+        surface_.draw_icon_magnifier({rect.x + 4.0f, rect.y + 4.0f, 20.0f, 20.0f}, theme_.text_disabled);
+        std::string disp = search_str.empty() ? placeholder : search_str;
+        std::uint32_t tc = search_str.empty() ? theme_.text_disabled : theme_.text;
+        surface_.draw_text(static_cast<int>(rect.x + 28.0f), static_cast<int>(rect.y + 6.0f), disp, tc, theme_.font_scale);
+        std::uint64_t id = widget_id(id_text);
+        return interact(id, rect);
+    }
+    // [Context 2] Draws an info callout card with icon and description
+    void info_card(const std::string& title, const std::string& desc, std::uint32_t accent_color) {
+        clear_last_widget();
+        const Rect rect = allocate(44.0f);
+        surface_.draw_rounded_rect(rect, theme_.corner_radius, theme_.window);
+        surface_.draw_rounded_rect_outline(rect, theme_.corner_radius, theme_.border, 1.0f);
+        surface_.fill_rect({rect.x, rect.y, 4.0f, rect.h}, accent_color);
+        surface_.draw_text(static_cast<int>(rect.x + 12.0f), static_cast<int>(rect.y + 4.0f), title, theme_.text, theme_.font_scale);
+        surface_.draw_text(static_cast<int>(rect.x + 12.0f), static_cast<int>(rect.y + 22.0f), desc, theme_.text_disabled, theme_.font_scale);
+    }
+    // [Context 3] Draws an alert card (Warning / Error)
+    void alert_box(const std::string& message, bool is_error = false) {
+        std::uint32_t col = is_error ? 0xFF5C5CE0U : 0xFF35C0FFU;
+        info_card(is_error ? "Error" : "Notice", message, col);
+    }
+    // [Context 4] Draws a collapsible accordion item
+    bool accordion_item(const std::string& title, bool& is_open) {
+        return begin_section(title, is_open);
+    }
+    // [Context 5] Ends an accordion item
+    void end_accordion_item() {
+        end_section();
+    }
+    // [Context 6] Draws a mini circular action button
+    Interaction circle_action_button(const std::string& id_text, const std::string& symbol, float radius = 14.0f) {
+        const std::uint64_t id = widget_id(id_text);
+        const Rect rect = allocate(radius * 2.0f);
+        const Interaction res = interact(id, rect);
+        int cx = static_cast<int>(rect.x + radius);
+        int cy = static_cast<int>(rect.y + radius);
+        surface_.draw_filled_circle(cx, cy, static_cast<int>(radius), res.active ? theme_.button_active : res.hovered ? theme_.button_hover : theme_.button);
+        surface_.draw_circle_outline(cx, cy, static_cast<int>(radius), theme_.border, 1);
+        Rect sz = surface_.measure_text(symbol, theme_.font_scale);
+        surface_.draw_text(static_cast<int>(cx - sz.w*0.5f), static_cast<int>(cy - sz.h*0.5f), symbol, theme_.text, theme_.font_scale);
+        return res;
+    }
+    // [Context 7] Draws a status tag pill with custom background color
+    void status_tag(const std::string& text, std::uint32_t bg_color) {
+        badge(text, bg_color);
+    }
+    // [Context 8] Draws a toggle switch with label on the right
+    Interaction switch_toggle(const std::string& label_text, bool& state) {
+        return toggle(label_text, state);
+    }
+    // [Context 9] Draws a vertical divider line inside layout
+    void vertical_separator(float height = 24.0f) {
+        const Rect r{cursor_x_, cursor_y_, 2.0f, height};
+        surface_.fill_rect(r, theme_.border);
+        cursor_x_ += 6.0f;
+    }
+    // [Context 10] Draws a horizontal spacer
+    void horizontal_space(float width = 8.0f) {
+        cursor_x_ += width;
+    }
+
+
+    // [Context 11] Draws an interactive opacity slider
+    Interaction opacity_slider(const std::string& id_text, float& opacity_val) {
+        clear_last_widget();
+        const Rect rect = allocate(22.0f);
+        surface_.draw_text(static_cast<int>(rect.x), static_cast<int>(rect.y + 3.0f), "Opacity", theme_.text, theme_.font_scale);
+        float sw_x = rect.x + 60.0f;
+        Rect sw_rect{sw_x, rect.y, rect.w - 60.0f, rect.h};
+        float v = opacity_val;
+        Interaction res = slider(id_text, v, 0.0f, 1.0f);
+        opacity_val = v;
+        return res;
+    }
+    // [Context 12] Draws a brush hardness slider
+    Interaction hardness_slider(const std::string& id_text, float& hardness_val) {
+        clear_last_widget();
+        float v = hardness_val;
+        Interaction res = slider(id_text, v, 0.0f, 1.0f);
+        hardness_val = v;
+        return res;
+    }
+    // [Context 13] Draws a canvas resolution / size indicator widget
+    void canvas_dimensions_badge(int w, int h) {
+        std::string s = std::to_string(w) + " x " + std::to_string(h) + " px";
+        badge(s, theme_.ribbon_card);
+    }
+    // [Context 14] Draws a color history swatch bar
+    void color_history_bar(const std::vector<std::uint32_t>& colors, std::size_t& selected_idx) {
+        if (colors.empty()) return;
+        color_palette("##hist", colors, selected_idx, static_cast<unsigned int>(colors.size()));
+    }
+    // [Context 15] Draws a zoom preset selector dropdown (25%, 50%, 100%, 200%, 400%)
+    Interaction zoom_presets(float& zoom_val) {
+        clear_last_widget();
+        const std::vector<std::string> opts = {"25%", "50%", "100%", "200%", "400%"};
+        std::size_t cur = (zoom_val < 40.0f) ? 0 : (zoom_val < 80.0f) ? 1 : (zoom_val < 150.0f) ? 2 : (zoom_val < 300.0f) ? 3 : 4;
+        Interaction res = combo("##zoom_pre", cur, opts);
+        if (res.changed) {
+            float vals[] = {25.0f, 50.0f, 100.0f, 200.0f, 400.0f};
+            zoom_val = vals[cur];
+        }
+        return res;
+    }
+    // [Context 16] Draws a secondary status pill
+    void status_pill(const std::string& text) {
+        badge(text, theme_.button);
+    }
+    // [Context 17] Draws a quick color preset row (Primary, Secondary, Accent)
+    void quick_palette(std::uint32_t c1, std::uint32_t c2, std::uint32_t c3, std::uint32_t& active_color) {
+        const Rect rect = allocate(24.0f);
+        float s = 20.0f;
+        std::uint32_t colors[] = {c1, c2, c3};
+        for (int i = 0; i < 3; ++i) {
+            Rect r{rect.x + i * (s + 4.0f), rect.y, s, s};
+            std::uint64_t id = widget_id("##qp_" + std::to_string(i));
+            Interaction res = interact(id, r);
+            if (res.clicked) active_color = colors[i];
+            surface_.draw_filled_circle(static_cast<int>(r.x + s*0.5f), static_cast<int>(r.y + s*0.5f), static_cast<int>(s*0.5f), colors[i]);
+            surface_.draw_circle_outline(static_cast<int>(r.x + s*0.5f), static_cast<int>(r.y + s*0.5f), static_cast<int>(s*0.5f), theme_.border, 1);
+        }
+    }
+    // [Context 18] Draws a coordinate readout chip
+    void coordinate_chip(int x, int y) {
+        std::string s = "X: " + std::to_string(x) + "  Y: " + std::to_string(y);
+        badge(s, theme_.window);
+    }
+    // [Context 19] Draws a selection size readout chip
+    void selection_size_chip(int w, int h) {
+        std::string s = std::to_string(w) + " x " + std::to_string(h);
+        badge(s, theme_.window);
+    }
+    // [Context 20] Draws a line length / angle readout
+    void line_measurement_chip(float length, float angle_deg) {
+        std::string s = std::to_string(static_cast<int>(length)) + " px | " + std::to_string(static_cast<int>(angle_deg)) + " deg";
+        badge(s, theme_.window);
+    }
+
+
+    // [Context 21]
+    Interaction button_primary(const std::string& label) {
+        return tool_button(label, label, true, 26.0f);
+    }
+
+    // [Context 22]
+    Interaction button_secondary(const std::string& label) {
+        return button(label);
+    }
+
+    // [Context 23]
+    Interaction button_accent(const std::string& label) {
+        return tool_button(label, label, true, 28.0f);
+    }
+
+    // [Context 24]
+    Interaction icon_button_pencil(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_icon_pencil(r, c); }, sel);
+    }
+
+    // [Context 25]
+    Interaction icon_button_bucket(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_icon_bucket(r, c); }, sel);
+    }
+
+    // [Context 26]
+    Interaction icon_button_dropper(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_icon_dropper(r, c); }, sel);
+    }
+
+    // [Context 27]
+    Interaction icon_button_layers(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_icon_layers(r, c); }, sel);
+    }
+
+    // [Context 28]
+    Interaction icon_button_magnifier(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_icon_magnifier(r, c); }, sel);
+    }
+
+    // [Context 29]
+    Interaction icon_button_eraser(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.outline_rect(r, c, 1.0f); }, sel);
+    }
+
+    // [Context 30]
+    Interaction icon_button_line(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_line(static_cast<int>(r.x), static_cast<int>(r.y+r.h), static_cast<int>(r.x+r.w), static_cast<int>(r.y), c); }, sel);
+    }
+
+    // [Context 31]
+    Interaction icon_button_rect(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.outline_rect(r, c, 1.0f); }, sel);
+    }
+
+    // [Context 32]
+    Interaction icon_button_circle(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_circle_outline(static_cast<int>(r.x+r.w*0.5f), static_cast<int>(r.y+r.h*0.5f), static_cast<int>(r.w*0.4f), c, 1); }, sel);
+    }
+
+    // [Context 33]
+    Interaction icon_button_star(const std::string& id_text, bool sel = false) {
+        return custom_icon_button(id_text, [](Surface& s, Rect r, std::uint32_t c){ s.draw_star_outline(r.x+r.w*0.5f, r.y+r.h*0.5f, r.w*0.4f, r.w*0.2f, c, 1.0f); }, sel);
+    }
+
+    // [Context 34]
+    Interaction slider_float_labeled(const std::string& label_text, float& v, float min_v, float max_v) {
+        label(label_text + ": " + std::to_string(v)); return slider(label_text, v, min_v, max_v);
+    }
+
+    // [Context 35]
+    Interaction slider_int_labeled(const std::string& label_text, int& v, int min_v, int max_v) {
+        float f = static_cast<float>(v); Interaction res = slider(label_text, f, static_cast<float>(min_v), static_cast<float>(max_v)); v = static_cast<int>(f); return res;
+    }
+
+    // [Context 36]
+    void label_title(const std::string& text) {
+        clear_last_widget(); Rect r = allocate(26.0f); surface_.draw_text(static_cast<int>(r.x), static_cast<int>(r.y+2), text, theme_.text, theme_.font_scale + 1);
+    }
+
+    // [Context 37]
+    void label_subheading(const std::string& text) {
+        clear_last_widget(); Rect r = allocate(20.0f); surface_.draw_text(static_cast<int>(r.x), static_cast<int>(r.y+2), text, theme_.accent, theme_.font_scale);
+    }
+
+    // [Context 38]
+    void label_muted(const std::string& text) {
+        clear_last_widget(); Rect r = allocate(18.0f); surface_.draw_text(static_cast<int>(r.x), static_cast<int>(r.y+2), text, theme_.text_disabled, theme_.font_scale);
+    }
+
+    // [Context 39]
+    void label_success(const std::string& text) {
+        clear_last_widget(); Rect r = allocate(18.0f); surface_.draw_text(static_cast<int>(r.x), static_cast<int>(r.y+2), text, 0xFF44DD44U, theme_.font_scale);
+    }
+
+    // [Context 40]
+    void label_warning(const std::string& text) {
+        clear_last_widget(); Rect r = allocate(18.0f); surface_.draw_text(static_cast<int>(r.x), static_cast<int>(r.y+2), text, 0xFF35C0FFU, theme_.font_scale);
+    }
+
+    // [Context 41]
+    void label_error(const std::string& text) {
+        clear_last_widget(); Rect r = allocate(18.0f); surface_.draw_text(static_cast<int>(r.x), static_cast<int>(r.y+2), text, 0xFF5C5CE0U, theme_.font_scale);
+    }
+
+    // [Context 42]
+    void card_begin(const std::string& id_text, float h = 100.0f) {
+        (void)id_text; clear_last_widget(); Rect r = allocate(h); surface_.draw_rounded_rect(r, theme_.corner_radius, theme_.window); surface_.draw_rounded_rect_outline(r, theme_.corner_radius, theme_.border, 1.0f);
+    }
+
+    // [Context 43]
+    void card_end() {
+        next_row(4.0f);
+    }
+
+    // [Context 44]
+    Interaction menu_item(const std::string& title, bool enabled = true) {
+        return button(title, enabled);
+    }
+
+    // [Context 45]
+    void menu_bar_begin(float h = 26.0f) {
+        clear_last_widget(); Rect r{0.0f, 0.0f, root_.w, h}; surface_.fill_rect(r, theme_.title_bar); cursor_x_ = static_cast<float>(theme_.padding); cursor_y_ = 2.0f;
+    }
+
+    // [Context 46]
+    void menu_bar_end() {
+        cursor_x_ = static_cast<float>(theme_.padding); cursor_y_ = static_cast<float>(theme_.padding);
+    }
+
+    // [Context 47]
+    Interaction tab_button(const std::string& label, bool active) {
+        return tool_button(label, label, active, 24.0f);
+    }
+
+    // [Context 48]
+    Interaction color_swatch_interactive(const std::string& id_text, std::uint32_t col) {
+        return color_circle_button(id_text, col, false, 20.0f);
+    }
+
+    // [Context 49]
+    Interaction color_swatch_large(const std::string& id_text, std::uint32_t col, bool sel = false) {
+        return color_circle_button(id_text, col, sel, 32.0f);
+    }
+
+    // [Context 50]
+    Interaction palette_cell(std::uint32_t col, bool sel = false) {
+        return color_circle_button("##c", col, sel, 18.0f);
+    }
+
+    // [Context 51]
+    void zoom_label(float zoom_val) {
+        badge(std::to_string(static_cast<int>(zoom_val)) + "%", theme_.window);
+    }
+
+    // [Context 52]
+    void status_bar_begin(float h = 22.0f) {
+        clear_last_widget(); Rect r{0.0f, root_.h - h, root_.w, h}; surface_.fill_rect(r, theme_.title_bar);
+    }
+
+    // [Context 53]
+    void status_bar_end() {
+        
+    }
+
+    // [Context 54]
+    void grid_toggle_button(bool& grid_on) {
+        if (tool_button("##grd", grid_on ? "Grid ON" : "Grid OFF", grid_on, 24.0f).clicked) grid_on = !grid_on;
+    }
+
+    // [Context 55]
+    void ruler_toggle_button(bool& ruler_on) {
+        if (tool_button("##rlr", ruler_on ? "Ruler ON" : "Ruler OFF", ruler_on, 24.0f).clicked) ruler_on = !ruler_on;
+    }
+
+    // [Context 56]
+    void full_screen_button(bool& fs_on) {
+        if (tool_button("##fs", fs_on ? "Exit Full" : "Fullscreen", fs_on, 24.0f).clicked) fs_on = !fs_on;
+    }
+
+    // [Context 57]
+    Interaction undo_button() {
+        return button("Undo");
+    }
+
+    // [Context 58]
+    Interaction redo_button() {
+        return button("Redo");
+    }
+
+    // [Context 59]
+    Interaction clear_button() {
+        return button("Clear");
+    }
+
+    // [Context 60]
+    Interaction save_button() {
+        return button("Save");
+    }
+
+    // [Context 61]
+    Interaction open_button() {
+        return button("Open");
+    }
+
+    // [Context 62]
+    Interaction export_button() {
+        return button("Export");
+    }
+
+    // [Context 63]
+    Interaction import_button() {
+        return button("Import");
+    }
+
+    // [Context 64]
+    Interaction cut_button() {
+        return button("Cut");
+    }
+
+    // [Context 65]
+    Interaction copy_button() {
+        return button("Copy");
+    }
+
+    // [Context 66]
+    Interaction paste_button() {
+        return button("Paste");
+    }
+
+    // [Context 67]
+    Interaction delete_button() {
+        return button("Delete");
+    }
+
+    // [Context 68]
+    Interaction select_all_button() {
+        return button("Select All");
+    }
+
+    // [Context 69]
+    Interaction invert_selection_button() {
+        return button("Invert Selection");
+    }
+
+    // [Context 70]
+    Interaction crop_button() {
+        return button("Crop");
+    }
+
+    // [Context 71]
+    Interaction resize_canvas_button() {
+        return button("Resize Canvas");
+    }
+
+    // [Context 72]
+    Interaction flip_h_button() {
+        return button("Flip Horizontal");
+    }
+
+    // [Context 73]
+    Interaction flip_v_button() {
+        return button("Flip Vertical");
+    }
+
+    // [Context 74]
+    Interaction rotate_left_button() {
+        return button("Rotate 90 Left");
+    }
+
+    // [Context 75]
+    Interaction rotate_right_button() {
+        return button("Rotate 90 Right");
+    }
+
+    // [Context 76]
+    Interaction brush_selector_combo(int& sel, const std::vector<std::string>& brushes) {
+        std::size_t s = static_cast<std::size_t>(sel); Interaction res = combo("##br_combo", s, brushes); sel = static_cast<int>(s); return res;
+    }
+
+    // [Context 77]
+    Interaction shape_selector_combo(int& sel, const std::vector<std::string>& shapes) {
+        std::size_t s = static_cast<std::size_t>(sel); Interaction res = combo("##sh_combo", s, shapes); sel = static_cast<int>(s); return res;
+    }
+
+    // [Context 78]
+    void size_picker_horizontal(int& sz, const std::vector<int>& sizes) {
+        const Rect r = allocate(26.0f); for (std::size_t i=0; i<sizes.size(); ++i) { Rect b{r.x + i*32.0f, r.y, 28.0f, 26.0f}; if (interact(widget_id("##sz_"+std::to_string(i)), b).clicked) sz = sizes[i]; surface_.draw_rounded_rect(b, 2.0f, sz==sizes[i]?theme_.accent:theme_.button); surface_.draw_text(static_cast<int>(b.x+6), static_cast<int>(b.y+4), std::to_string(sizes[i]), theme_.text); }
+    }
+
+    // [Context 79]
+    void history_step_item(const std::string& action_name, bool active) {
+        const Rect r = allocate(20.0f); surface_.draw_text(static_cast<int>(r.x+10), static_cast<int>(r.y+2), action_name, active ? theme_.accent : theme_.text_disabled);
+    }
+
+    // [Context 80]
+    Interaction layer_visibility_checkbox(bool& vis) {
+        return checkbox("Visible", vis);
+    }
+
+    // [Context 81]
+    Interaction layer_lock_checkbox(bool& locked) {
+        return checkbox("Lock", locked);
+    }
+
+    // [Context 82]
+    Interaction layer_opacity_slider(float& opac) {
+        return opacity_slider("##lay_op", opac);
+    }
+
+    // [Context 83]
+    Interaction filter_blur_button() {
+        return button("Blur Filter");
+    }
+
+    // [Context 84]
+    Interaction filter_sharpen_button() {
+        return button("Sharpen Filter");
+    }
+
+    // [Context 85]
+    Interaction filter_grayscale_button() {
+        return button("Grayscale");
+    }
+
+    // [Context 86]
+    Interaction filter_sepia_button() {
+        return button("Sepia");
+    }
+
+    // [Context 87]
+    Interaction filter_invert_button() {
+        return button("Invert Colors");
+    }
+
+    // [Context 88]
+    Interaction canvas_fit_window_button() {
+        return button("Fit Window");
+    }
+
+    // [Context 89]
+    Interaction canvas_actual_size_button() {
+        return button("Actual Size (100%)");
+    }
+
+    // [Context 90]
+    void theme_switch_fluent_light() {
+        if (button("Light Theme").clicked) set_theme(Theme::make_fluent_light());
+    }
+
+    // [Context 91]
+    void theme_switch_fluent_dark() {
+        if (button("Dark Theme").clicked) set_theme(Theme::make_fluent_dark());
+    }
+
+    // [Context 92]
+    void theme_switch_classic_dark() {
+        if (button("Classic Dark").clicked) set_theme(Theme{});
+    }
+
+    // [Context 93]
+    void cursor_tool_indicator(const std::string& tool_name) {
+        status_item("Tool", tool_name);
+    }
+
+    // [Context 94]
+    void fps_counter_display(float fps) {
+        status_item("FPS", std::to_string(static_cast<int>(fps)));
+    }
+
+    // [Context 95]
+    void memory_usage_display(std::size_t bytes) {
+        status_item("RAM", std::to_string(bytes / 1024) + " KB");
+    }
+
+    // [Context 96]
+    void canvas_zoom_percentage_chip(float zoom) {
+        badge(std::to_string(static_cast<int>(zoom)) + "%", theme_.accent);
+    }
+
+    // [Context 97]
+    Interaction dock_tab_pill(const std::string& title, bool active) {
+        return tool_button(title, title, active, 22.0f);
+    }
+
+    // [Context 98]
+    void drag_drop_target_indicator(Rect rect) {
+        surface_.draw_selection_marquee(rect, theme_.accent, 0xFFFFFFFFU, 4);
+    }
+
+    // [Context 99]
+    Interaction context_menu_item(const std::string& label) {
+        return button(label);
+    }
+
+    // [Context 100]
+    bool radial_menu_open(int x, int y, std::uint32_t& col) {
+        return color_picker_radial(x, y, 40, col);
     }
 
 private:
